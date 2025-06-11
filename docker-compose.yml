@@ -2,7 +2,7 @@ services:
   # Valkey is a Redis-compatible in-memory data store for metadata and caching
   valkey:
     image: valkey/valkey:latest
-    container_name: boilstream-valkey
+    container_name: valkey
     restart: unless-stopped
     ports:
       - "6379:6379"
@@ -21,7 +21,7 @@ services:
   # Prometheus for metrics collection
   prometheus:
     image: prom/prometheus:latest
-    container_name: boilstream-prometheus
+    container_name: prometheus
     restart: unless-stopped
     ports:
       - "9090:9090"
@@ -37,7 +37,7 @@ services:
       - "--storage.tsdb.min-block-duration=2h"
       - "--storage.tsdb.max-block-duration=2h"
       - "--query.lookback-delta=1s"
-      - "--storage.tsdb.retention.time=7d"  # 7 days retention for free tier
+      - "--storage.tsdb.retention.time=7d" # 7 days retention for free tier
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
       interval: 10s
@@ -52,7 +52,7 @@ services:
   # Grafana for visualization and monitoring dashboards
   grafana:
     image: grafana/grafana:latest
-    container_name: boilstream-grafana
+    container_name: grafana
     restart: unless-stopped
     ports:
       - "3000:3000"
