@@ -28,6 +28,8 @@ AWS_REGION=us-east-1 S3_BUCKET=my_bucket S3_FLUSH_INTERVAL_MS=250 ./boilstream -
 duckdb
 ```
 
+> NOTE: If the amazing [Airport extension](https://github.com/Query-farm/airport) is not already available on the community DuckDB registry (the `INSTALL` command fails), you can compile it yourself as per the repository guideline.
+
 ```sql
 INSTALL airport FROM community;
 LOAD airport;
