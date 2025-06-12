@@ -13,10 +13,10 @@ This repository contains free tier binary builds and docker compose file for run
 docker-compose up -d
 
 # Download boilstream
-#curl -L -o boilstream https://www.boilstream.com/binaries/linux-x64/boilstream-0.2.2
-#curl -L -o boilstream https://www.boilstream.com/binaries/linux-x64/boilstream-0.2.2
-#curl -L -o boilstream https://www.boilstream.com/binaries/linux-aarch64/boilstream-0.2.2
-curl -L -o boilstream https://www.boilstream.com/binaries/darwin-aarch64/boilstream-0.2.2
+#curl -L -o boilstream https://www.boilstream.com/binaries/linux-x64/boilstream
+#curl -L -o boilstream https://www.boilstream.com/binaries/linux-x64/boilstream
+#curl -L -o boilstream https://www.boilstream.com/binaries/linux-aarch64/boilstream
+curl -L -o boilstream https://www.boilstream.com/binaries/darwin-aarch64/boilstream
 chmod +x boilstream
 
 # Start boilstream
