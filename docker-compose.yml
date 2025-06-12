@@ -1,4 +1,45 @@
 services:
+  # MinIO for local testing
+  minio:
+    image: quay.io/minio/minio:latest
+    container_name: minio
+    restart: unless-stopped
+    ports:
+      - "9000:9000" # API port
+      - "9001:9001" # Web console port
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_PROMETHEUS_AUTH_TYPE: "public"
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+    networks:
+      - boilstream-network
+
+  # Create default buckets on startup
+  minio-setup:
+    image: quay.io/minio/mc:latest
+    container_name: minio-setup
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      sleep 5;
+      /usr/bin/mc config host add minio http://minio:9000 minioadmin minioadmin;
+      /usr/bin/mc mb --ignore-existing minio/test-bucket;
+      /usr/bin/mc mb --ignore-existing minio/ingestion-data;
+      /usr/bin/mc anonymous set download minio/test-bucket;
+      exit 0;
+      "
+    networks:
+      - boilstream-network
+
   # Valkey is a Redis-compatible in-memory data store for metadata and caching
   valkey:
     image: valkey/valkey:latest
@@ -81,6 +122,8 @@ services:
       - "host.docker.internal:host-gateway"
 
 volumes:
+  minio_data:
+    driver: local
   valkey_data:
     driver: local
   prometheus_data:
