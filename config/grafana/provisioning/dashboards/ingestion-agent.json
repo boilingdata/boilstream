@@ -150,12 +150,21 @@
           "editorMode": "code",
           "expr": "pipeline_bytes_processed_total - (pipeline_bytes_processed_total offset 1s)",
           "interval": "1s",
-          "legendFormat": "Bytes/second",
+          "legendFormat": "Arrow IPC (Bytes/sec)",
           "range": true,
           "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "editorMode": "code",
+          "expr": "s3_throughput_mbs * 1024 * 1024",
+          "interval": "1s",
+          "legendFormat": "S3 Uploads (Bytes/sec)",
+          "range": true,
+          "refId": "B"
         }
       ],
-      "title": "Pipeline Throughput",
+      "title": "Pipeline Throughput (Arrow IPC, S3 Uploads)",
       "type": "timeseries"
     },
     {
