@@ -19,6 +19,12 @@ docker-compose up -d
 curl -L -o boilstream https://www.boilstream.com/binaries/darwin-aarch64/boilstream
 chmod +x boilstream
 
+## Ensure you have Python and DuckDB installed.
+# NOTE: Rust based BoilStream server launches Python based DuckDB processor with zero-copy
+#       Arrow data interworking. The Python runtime and DuckDB session/connection is created
+#       once and reused for high performance processing without copying data.
+python3 -m pip install pyarrow duckdb
+
 # Start boilstream
 # NOTE: You can use the help switch to get configuration options
 AWS_REGION=us-east-1 S3_BUCKET=my_bucket S3_FLUSH_INTERVAL_MS=250 ./boilstream --help
@@ -28,19 +34,38 @@ AWS_REGION=us-east-1 S3_BUCKET=my_bucket S3_FLUSH_INTERVAL_MS=250 ./boilstream -
 duckdb
 ```
 
-> NOTE: If the amazing [Airport extension](https://github.com/Query-farm/airport) is not already available on the community DuckDB registry (the `INSTALL` command fails), you can compile it yourself as per the repository guideline.
+> NOTE (2025-06-16): If the amazing [Airport extension](https://github.com/dforsber/airport/tree/create-materialized-view-support) is not already available on the community DuckDB registry (the `INSTALL` command fails), you can compile it yourself as per the repository guideline. The link points to forked version that has the `CREATE VIEW` capability, so **use the "create-materialized-view-support" branch** from [this repository](https://github.com/dforsber/airport/tree/create-materialized-view-support). The [PR#20](https://github.com/Query-farm/airport/pull/20) is under review on the main repository.
 
 ```sql
 INSTALL airport FROM community;
 LOAD airport;
 ATTACH 'boilstream' (TYPE AIRPORT, location 'grpc://localhost:50051/');
+
 CREATE TABLE boilstream.s3.people (name VARCHAR, age INT, tags VARCHAR[]);
+CREATE VIEW boilstream.s3.filtered_adults AS SELECT * FROM boilstream.s3.people WHERE age > 50;
+CREATE VIEW boilstream.s3.filtered_b AS SELECT * FROM boilstream.s3.people WHERE name LIKE 'b%';
+CREATE VIEW boilstream.s3.filtered_a AS SELECT * FROM boilstream.s3.people WHERE name LIKE 'a%';
+
 INSERT INTO boilstream.s3.people
    SELECT
       'boilstream_' || i::VARCHAR AS name,
       (i % 100) + 1 AS age,
       ['duckdb', 'ducklake'] AS tags
    FROM generate_series(1, 20000) as t(i);
+```
+
+```sql
+D ATTACH 'boilstream' (TYPE AIRPORT, location 'grpc://localhost:50051/');
+D SELECT table_name, comment FROM duckdb_tables();
+┌────────────────────────┬─────────────────────────────────────────────────────────────────────────────┐
+│       table_name       │                                   comment                                   │
+│        varchar         │                                   varchar                                   │
+├────────────────────────┼─────────────────────────────────────────────────────────────────────────────┤
+│ people→filtered_adults │ Materialized view: SELECT * FROM boilstream.s3.people WHERE age > 50;       │
+│ people→filtered_b      │ Materialized view: SELECT * FROM boilstream.s3.people WHERE name LIKE 'b%'; │
+│ people→filtered_a      │ Materialized view: SELECT * FROM boilstream.s3.people WHERE name LIKE 'a%'; │
+│ people                 │ Topic created from DuckDB Airport CREATE TABLE request for table 'people'   │
+└────────────────────────┴─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 **Monitor your data**:
