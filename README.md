@@ -23,20 +23,24 @@ chmod +x boilstream
 # NOTE: Rust based BoilStream server launches Python based DuckDB processor with zero-copy
 #       Arrow data interworking. The Python runtime and DuckDB session/connection is created
 #       once and reused for high performance processing without copying data.
+#
+# On Ubuntu 24, run:
+# sudo apt install python3.12-venv python3-pip
 python3 -m venv venv
 source venv/bin/activate
-pip install pyarrow duckdb
+python3 -m pip install pyarrow duckdb
+export PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1
 
 # Start boilstream
 # NOTE: You can use the help switch to get configuration options
-AWS_REGION=us-east-1 S3_BUCKET=my_bucket S3_FLUSH_INTERVAL_MS=250 ./boilstream --help
+./boilstream --config local-dev.yaml
 
 # Start streaming data with DuckDB
 # NOTE: When DuckDB statement returns, data is guaranteed to be on S3
 duckdb
 ```
 
-> NOTE (2025-06-16): If the amazing [Airport extension](https://github.com/dforsber/airport/tree/create-materialized-view-support) is not already available on the community DuckDB registry (the `INSTALL` command fails), you can compile it yourself as per the repository guideline. The link points to forked version that has the `CREATE VIEW` capability, so **use the "create-materialized-view-support" branch** from [this repository](https://github.com/dforsber/airport/tree/create-materialized-view-support). The [PR#20](https://github.com/Query-farm/airport/pull/20) is under review on the main repository.
+> NOTE (2025-06-16): If the amazing [Airport extension](https://github.com/dforsber/airport/tree/create-materialized-view-support) is not already available on the community DuckDB registry (the `INSTALL` command fails or it does not support `CREATE VIEW` command), you can compile it yourself as per the repository guideline. The link points to forked version that has the `CREATE VIEW` capability. The [PR#20](https://github.com/Query-farm/airport/pull/20) is under review on the main repository.
 
 ```sql
 INSTALL airport FROM community;

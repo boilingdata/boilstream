@@ -1,0 +1,118 @@
+# BoilStream Development Configuration
+# This file contains all configurable settings for local development.
+# Environment variables will override these settings.
+
+# AWS Configuration
+aws:
+  region: "eu-west-1"
+  # access_key_id: "your-access-key"  # Optional - can use AWS CLI/IAM roles
+  # secret_access_key: "your-secret-key"  # Optional - can use AWS CLI/IAM roles
+  https_conn_pool_size: 100
+
+# Storage Configuration
+storage:
+  # Multiple storage backends can be configured simultaneously
+  backends:
+    - name: "primary-s3"
+      backend_type: "s3"
+      enabled: true
+      primary: true  # Primary backend - operations must succeed here
+      endpoint: "http://localhost:9000"
+      access_key: "minioadmin"
+      secret_key: "minioadmin"
+      region: "us-east-1"
+      use_path_style: true  # Required for MinIO
+      bucket: "ingestion-data"
+      prefix: "/"
+      max_concurrent_uploads: 10
+      upload_id_pool_capacity: 100
+      max_retries: 3
+      initial_backoff_ms: 100
+      max_retry_attempts: 3
+      flush_interval_ms: 1000
+      max_multipart_object_size: 104857600  # 100 MB
+    # - name: "backup-filesystem"
+    #   backend_type: "filesystem"
+    #   enabled: true
+    #   primary: false  # Secondary backend - failures are logged but not fatal
+    #   prefix: "/tmp/storage"
+    # - name: "debug-noop"
+    #   backend_type: "noop"
+    #   enabled: false
+    #   primary: false  # For testing/benchmarking without actual storage
+
+# Server Configuration
+server:
+  valkey_url: "redis://localhost:6379"
+  # tokio_worker_threads: 16  # Optional - defaults to system CPU count
+  flight_thread_count: 1
+  flight_base_port: 50050
+  admin_flight_port: 50160
+  consumer_flight_port: 50250
+
+# Data Processing Configuration
+processing:
+  data_processing_threads: 8
+  buffer_pool_max_size: 50
+  window_queue_capacity: 30000
+  window_ms: 10000
+  dry_run: false
+  bg_dry_run: false
+  include_metadata_columns: true
+  schema_validation_enabled: true
+  parquet:
+    compression: "ZSTD"
+    dictionary_enabled: true
+
+# Rate Limiting Configuration
+rate_limiting:
+  disabled: false
+  max_requests: 15000000
+  burst_limit: 20000000
+  global_limit: 150000000
+  base_size_bytes: 4096
+
+# TLS Configuration
+tls:
+  disabled: true  # Disabled for development
+  # cert_path: "/path/to/cert.pem"
+  # key_path: "/path/to/key.pem"
+  # cert_pem: "-----BEGIN CERTIFICATE-----\n..."
+  # key_pem: "-----BEGIN PRIVATE KEY-----\n..."
+  # grpc_default_ssl_roots_file_path: "/path/to/ca-certificates.crt"
+
+# Authentication Configuration
+auth:
+  providers: []  # Empty for development - no auth
+  authorization_enabled: false
+  admin_groups: []
+  read_only_groups: []
+  cognito:
+    # user_pool_id: "us-east-1_example"
+    # region: "us-east-1"
+    # audience: "client-id"
+  azure:
+    # tenant_id: "tenant-id"
+    # client_id: "client-id"
+    allow_multi_tenant: false
+  gcp:
+    # client_id: "client-id"
+    # project_id: "project-id"
+    require_workspace_domain: false
+  auth0:
+    # tenant: "your-tenant.auth0.com"
+    # audience: "your-api-identifier"
+    # groups_namespace: "https://your-app.com/groups"
+  okta:
+    # org_domain: "your-org.okta.com"
+    # audience: "api://your-audience"
+    # auth_server_id: "your-auth-server"
+
+# Metrics Configuration
+metrics:
+  port: 8081
+  flush_interval_ms: 1000
+
+# Logging Configuration
+logging:
+  rust_log: "info"
