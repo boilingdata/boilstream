@@ -23,7 +23,9 @@ chmod +x boilstream
 # NOTE: Rust based BoilStream server launches Python based DuckDB processor with zero-copy
 #       Arrow data interworking. The Python runtime and DuckDB session/connection is created
 #       once and reused for high performance processing without copying data.
-python3 -m pip install pyarrow duckdb
+python3 -m venv venv
+source venv/bin/activate
+pip install pyarrow duckdb
 
 # Start boilstream
 # NOTE: You can use the help switch to get configuration options
