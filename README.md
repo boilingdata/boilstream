@@ -1,12 +1,16 @@
-# BoilStream - Free Tier Data Ingestion
+# BoilStream - Stream to Gold 🏆
 
-BoilStream is a high-performance data ingestion system that streams your data directly to S3 with automatic Parquet conversion, schema validation, and real-time monitoring.
+BoilStream is a high-performance data ingestion system that streams your data to S3 with automatic Parquet conversion, schema validation, and real-time monitoring.
 
-It supports thousands of concurrent writers and GBs per second data ingestion rates, while using efficient stream aggregation from all the writers into per topic Parquet files. High throughput streaming creates S3 multipart upload files where Parquet row groups are uploaded concurrently (s3 multipart parts). The Parquet file is finalised when size/time threshold is reached.
+It supports thousands of concurrent writers and GBs per second data ingestion rates (with single ingestion port), while using efficient stream aggregation from all the writers into per topic Parquet files. High throughput streaming creates S3 multipart upload files where Parquet row groups are uploaded concurrently (S3 multipart parts). The Parquet file is finalised when size/time threshold is reached.
 
-This repository contains free tier binary builds and docker compose file for running the required auxiliary services for metadata registry and monitoring dashboard.
+- You create new topics with `CREATE TABLE` and write to them with `INSERT` from DuckDB with Airport extension, no other integration needed
+- You create forked streams with `CREATE VIEW` (this requires our forked Airport extension for the `CREATE VIEW` command routing to the FlightRPC server). Forked streams are diskless pipelines like the main topics and land on their own S3 prefix with hive partitioning
+- 🚀 Now BoilStream also stores data on **local disk persisted DuckDB databases** 🦆 with minimal impact on the data ingestion throughput 🔥. See [local-dev.yaml](local-dev.yaml) configuration file and the `duckdb_persistence` configuration block.
 
-## 🚀 Start
+This repository contains download links to the free tier binary builds and docker compose file for running the required auxiliary services for metadata registry and monitoring dashboard.
+
+## Start
 
 ```bash
 # Start auxiliary containers
@@ -19,24 +23,15 @@ docker-compose up -d
 curl -L -o boilstream https://www.boilstream.com/binaries/darwin-aarch64/boilstream
 chmod +x boilstream
 
-## Ensure you have Python and DuckDB installed.
-# NOTE: Rust based BoilStream server launches Python based DuckDB processor with zero-copy
-#       Arrow data interworking. The Python runtime and DuckDB session/connection is created
-#       once and reused for high performance processing without copying data.
-#
-# On Ubuntu 24, run:
-# sudo apt install python3.12-venv python3-pip
-python3 -m venv venv
-source venv/bin/activate
-python3 -m pip install pyarrow duckdb
-export PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1
-
 # Start boilstream
-# NOTE: You can use the help switch to get configuration options
 ./boilstream --config local-dev.yaml
 
 # Start streaming data with DuckDB
-# NOTE: When DuckDB statement returns, data is guaranteed to be on S3
+# NOTE: The storage.backends.flush_interval_ms (backend type "s3") configuration option
+#       defines the S3 synchronization interval, which also completes the DuckDB INSERT
+#       transaction. The smaller the flush interval, the faster response times you get,
+#       but smaller fragmented Parquet files.
+# NOTE: When DuckDB statement returns, data is guaranteed to be on S3!
 duckdb
 ```
 
