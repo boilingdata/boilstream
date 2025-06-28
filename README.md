@@ -6,7 +6,7 @@ It supports thousands of concurrent writers and GBs per second data ingestion ra
 
 - You create new topics with `CREATE TABLE` and write to them with `INSERT` from DuckDB with Airport extension, no other integration needed
 - You create forked streams with `CREATE VIEW` (this requires our forked Airport extension for the `CREATE VIEW` command routing to the FlightRPC server). Forked streams are diskless pipelines like the main topics and land on their own S3 prefix with hive partitioning
-- 🚀 Now BoilStream also stores data on **local disk persisted DuckDB databases** 🦆 with minimal impact on the data ingestion throughput 🔥. See [local-dev.yaml](local-dev.yaml) configuration file and the `duckdb_persistence` configuration block.
+- 🚀 Now BoilStream also stores data on **local disk persisted DuckDB databases** 🦆 with minimal impact on the data ingestion throughput 🔥. See [local-dev.yaml](local-dev.yaml) configuration file and the `duckdb_persistence` configuration block. Efficient zero-copy Arrow to DuckDB ingestion is used with native C++/Rust integration.
 
 This repository contains download links to the free tier binary builds and docker compose file for running the required auxiliary services for metadata registry and monitoring dashboard.
 
