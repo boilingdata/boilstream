@@ -31,6 +31,8 @@ storage:
       max_retry_attempts: 3
       flush_interval_ms: 10000
       max_multipart_object_size: 104857600  # 100 MB
+      # DuckLake integration - register files with these catalogs after successful upload
+      ducklake: ["my_ducklake"]
     # - name: "backup-filesystem"
     #   backend_type: "filesystem"
     #   enabled: true
@@ -79,6 +81,61 @@ duckdb_persistence:
   # Each topic gets: {storage_path}/topic_{id}_{name}.duckdb
   storage_path: "/tmp/duckdb/topics"
   max_writers: 10 # Priority based DuckDB database ingestion, max databases
+
+# DuckLake Configuration
+ducklake:
+  - name: my_ducklake
+    # Data path where Parquet files are stored (must match storage backend path)
+    # For reconciliation and configuration validation (we don't want to try to parse the SQL to find the data path)
+    data_path: "s3://ingestion-data/"
+    # See https://ducklake.select/docs/stable/duckdb/usage/connecting#parameters
+    attach: |
+      FROM duckdb_secrets();
+      -- Load extensions
+      INSTALL ducklake;
+      INSTALL postgres;
+      INSTALL aws;
+      INSTALL httpfs;
+      LOAD ducklake;
+      LOAD postgres;
+      LOAD aws;
+      LOAD httpfs;
+      -- S3 access for MinIO
+      CREATE OR REPLACE SECRET secretForDirectS3Access (
+          TYPE S3,
+          KEY_ID 'minioadmin',
+          SECRET 'minioadmin',
+          REGION 'us-east-1',
+          ENDPOINT 'localhost:9000',
+          USE_SSL false,
+          URL_STYLE 'path',
+          SCOPE 's3://ingestion-data/'
+      );
+      -- PostgreSQL secret for DuckLake catalog backend
+      CREATE OR REPLACE SECRET postgres (
+        TYPE POSTGRES,
+        HOST 'localhost',
+        PORT 5432,
+        DATABASE 'boilstream',
+        USER 'postgres',
+        PASSWORD 'postgres'
+      );
+      -- DuckLake Postgres catalog
+      CREATE OR REPLACE SECRET pg_secret (
+        TYPE DUCKLAKE,
+        METADATA_PATH '',
+        DATA_PATH 's3://ingestion-data/',
+        METADATA_PARAMETERS MAP {'TYPE': 'postgres', 'SECRET': 'postgres'}
+      );
+      -- DuckLake attachment with Postgres catalog
+      ATTACH 'ducklake:pg_secret' AS my_ducklake;
+    # Optional: Specify which topics to include (if not specified, all topics are included)
+    # topics: ["events", "people"]
+    # Reconciliation settings for ensuring S3 and DuckLake are synchronized
+    reconciliation:
+      on_startup: true        # Run reconciliation when application starts
+      interval_minutes: 60    # Check for missing files every hour
+      max_concurrent_registrations: 10  # Parallel registration limit
 
 # Rate Limiting Configuration
 rate_limiting:

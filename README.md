@@ -7,6 +7,7 @@ It supports thousands of concurrent writers and GBs per second data ingestion ra
 - You create new topics with `CREATE TABLE` and write to them with `INSERT` from DuckDB with Airport extension, no other integration needed
 - You create forked streams with `CREATE VIEW` (this requires our forked Airport extension for the `CREATE VIEW` command routing to the FlightRPC server). Forked streams are diskless pipelines like the main topics and land on their own S3 prefix with hive partitioning
 - 🚀 Now BoilStream also stores data on **local disk persisted DuckDB databases** 🦆 with minimal impact on the data ingestion throughput 🔥. See [local-dev.yaml](local-dev.yaml) configuration file and the `duckdb_persistence` configuration block. Efficient zero-copy Arrow to DuckDB ingestion is used with native C++/Rust integration.
+- 🚀 DuckLake integration included!
 
 This repository contains download links to the free tier binary builds and docker compose file for running the required auxiliary services for metadata registry and monitoring dashboard.
 
@@ -99,18 +100,18 @@ BoilStream processes your data through:
 1. **Flight RPC** - High-performance data ingestion
 2. **Valkey** - Metadata Registry, like for Arrow Schemas
 3. **S3** - Automated Parquet storage with Hive partitioning
+4. **DuckLake** - Integration with [DuckLake](https://duckdb.org/2025/05/27/ducklake.html)
+5. **Rate limiting** - Rate limiting support
 
 Auxiliary services:
 
-4. **Prometheus** - Metrics collection
-5. **Grafana** - Real-time monitoring dashboards
+6. **Prometheus** - Metrics collection
+7. **Grafana** - Real-time monitoring dashboards
 
 ## 🆙 Upgrading to Paid version
 
 - **Security**: FlightRPC with TLS, authentication and access control
 - **Uncapped**: No throughput limits, max concurrent sessions with single node 10k (configurable)
-- **Rate limiting**: Rate limiting support
-- **DuckLake**: Integration with [DuckLake](https://duckdb.org/2025/05/27/ducklake.html) for transactional Data Lake
 
 ## 🆙 Upgrading to Enterprise version
 
