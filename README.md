@@ -1,6 +1,8 @@
 # BoilStream - Stream to Gold 🏆
 
-BoilStream is a high-performance data ingestion system that streams your data to S3 with automatic Parquet conversion, schema validation, and real-time monitoring.
+BoilStream is a high-performance data ingestion and analytics system that streams your data to S3 with automatic Parquet conversion, schema validation, and real-time monitoring.
+
+**You can connect to BoilStream also with postgres compatible clients for realtime analytics with DuckDB SQL.**
 
 It supports thousands of concurrent writers and GBs per second data ingestion rates (with single ingestion port), while using efficient stream aggregation from all the writers into per topic Parquet files. High throughput streaming creates S3 multipart upload files where Parquet row groups are uploaded concurrently (S3 multipart parts). The Parquet file is finalised when size/time threshold is reached.
 
@@ -84,7 +86,7 @@ D SELECT table_name, comment FROM duckdb_tables();
 
 > NOTE: BoilStream can ingest GBs per second, so you may hit the free tier limit quickly.
 
-- **Data ingestion**: 1GB per hour (you need to restart if you hit the limit)
+- **Data ingestion**: 40 GB per hour (you need to restart if you hit the limit)
 - **Max concurrent sessions**: Limited to 10
 - **No authentication**: No authentication or access control
 - **No TLS**: Runs on plain FlightRPC connection without TLS
@@ -102,11 +104,12 @@ BoilStream processes your data through:
 3. **S3** - Automated Parquet storage with Hive partitioning
 4. **DuckLake** - Integration with [DuckLake](https://duckdb.org/2025/05/27/ducklake.html)
 5. **Rate limiting** - Rate limiting support
+6. **BI Tool Integration** - Postgres compatible interface for BI Tool and other integrations
 
 Auxiliary services:
 
-6. **Prometheus** - Metrics collection
-7. **Grafana** - Real-time monitoring dashboards
+7. **Prometheus** - Metrics collection
+8. **Grafana** - Real-time monitoring dashboards
 
 ## 🆙 Upgrading to Paid version
 

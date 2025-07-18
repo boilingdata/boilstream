@@ -82,7 +82,8 @@ duckdb_persistence:
   storage_path: "/tmp/duckdb/topics"
   max_writers: 10 # Priority based DuckDB database ingestion, max databases
 
-# DuckLake Configuration
+# DuckLake Configuration for ACID transactions and metadata management
+# Note: Requires DuckLake extension to be available in DuckDB
 ducklake:
   - name: my_ducklake
     # Data path where Parquet files are stored (must match storage backend path)
@@ -115,7 +116,7 @@ ducklake:
       CREATE OR REPLACE SECRET postgres (
         TYPE POSTGRES,
         HOST 'localhost',
-        PORT 5432,
+        PORT 5433,
         DATABASE 'boilstream',
         USER 'postgres',
         PASSWORD 'postgres'
@@ -133,17 +134,38 @@ ducklake:
     # topics: ["events", "people"]
     # Reconciliation settings for ensuring S3 and DuckLake are synchronized
     reconciliation:
-      on_startup: true        # Run reconciliation when application starts
-      interval_minutes: 60    # Check for missing files every hour
+      on_startup: true                  # Run reconciliation when application starts
+      interval_minutes: 10              # Check for missing files
       max_concurrent_registrations: 10  # Parallel registration limit
+
+# PGWire PostgreSQL Protocol Configuration
+pgwire:
+  enabled: true
+  port: 5432
+  username: "boilstream"
+  password: "boilstream"
+  refresh_interval_seconds: 6000
+  # SQL commands to execute during DuckDB initialization
+  # These run once when each database instance is created
+  initialization_sql: |
+    INSTALL icu;
+    LOAD icu;
+  # TLS Configuration for PostgreSQL connections
+  tls:
+    enabled: false  # Disabled for development
+    # For production, enable TLS and provide certificates:
+    # cert_path: "/path/to/pgwire_cert.pem"
+    # key_path: "/path/to/pgwire_key.pem"
+    # Or use PEM strings directly:
+    # cert_pem: "-----BEGIN CERTIFICATE-----\n..."
+    # key_pem: "-----BEGIN PRIVATE KEY-----\n..."
 
 # Rate Limiting Configuration
 rate_limiting:
   disabled: false
-  max_requests: 15000000
-  burst_limit: 20000000
-  global_limit: 150000000
-  base_size_bytes: 4096
+  max_requests: 700
+  burst_limit: 1000
+  global_limit: 3500
 
 # TLS Configuration
 tls:
