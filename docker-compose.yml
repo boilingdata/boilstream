@@ -40,25 +40,6 @@ services:
     networks:
       - boilstream-network
 
-  # Valkey is a Redis-compatible in-memory data store for metadata and caching
-  valkey:
-    image: valkey/valkey:latest
-    container_name: valkey
-    restart: unless-stopped
-    ports:
-      - "6379:6379"
-    command: valkey-server /etc/valkey/valkey.conf --appendonly yes
-    volumes:
-      - valkey_data:/data
-      - ./config/valkey.conf:/etc/valkey/valkey.conf:ro
-    healthcheck:
-      test: ["CMD", "valkey-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 3
-    networks:
-      - boilstream-network
-
   # Prometheus for metrics collection
   prometheus:
     image: prom/prometheus:latest
@@ -123,8 +104,6 @@ services:
 
 volumes:
   minio_data:
-    driver: local
-  valkey_data:
     driver: local
   prometheus_data:
     driver: local

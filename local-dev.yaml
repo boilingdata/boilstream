@@ -76,7 +76,7 @@ processing:
 # Per-topic database files for real-time ingestion persistence
 # This is separate from storage backends and Hive partitioned Parquet files
 duckdb_persistence:
-  enabled: true  # Disable DuckDB persistence completely
+  enabled: true
   # Directory for topic-specific database files (separate from analytical DuckDB)
   # Each topic gets: {storage_path}/topic_{id}_{name}.duckdb
   storage_path: "/tmp/duckdb/topics"
@@ -150,6 +150,8 @@ pgwire:
   initialization_sql: |
     INSTALL icu;
     LOAD icu;
+    PRAGMA enable_logging('QueryLog');
+    SET logging_storage = 'stdout';
   # TLS Configuration for PostgreSQL connections
   tls:
     enabled: false  # Disabled for development
