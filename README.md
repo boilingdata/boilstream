@@ -2,7 +2,7 @@
 
 > **NOTE: 2025-07-26: BoilStream v0.6.1 runs DuckDB 1.4.0-pre version and thus extensions installations fail. DuckDB extension interface changes between v1.3 and v1.4 and thus pre-existing extensions can't be installed as they don't work. Once DuckDB v1.4 is out, you can install extensions normally, and then also DuckLake integration works again. We use v1.4.0-pre version because it includes new Arrow C API that is future-proof rather than the v1.3 deprecated one.**
 
-[BoilStream](https://wwww.boilstream.com/) is a small binary DuckDB server with steroids.
+[BoilStream](https://wwww.boilstream.com/) is a small binary DuckDB server with steroids written in Rust (and a bit of C++).
 
 Download, start, and connect with any BI Tool with Postgres interface for real-time analytics - connect from [DuckDB clients with Airport extension](https://duckdb.org/community_extensions/extensions/airport.html) for high-throughput and scalable real-time data ingestion. It streams Parquet to storage backends like S3 with DuckLake in realtime as compact, hive partitioned Parquet files.
 
@@ -36,11 +36,15 @@ BoilStream supports thousands of concurrent writers and GBs per second data inge
 
 ## Postgres interface
 
-**You can run any BI Tool over the postgres interface on the standard port 5432** (configurable). We have tested with DBeaver, Metabase, Superset, Grafana, and psql. BoilStream uses
+**You can run any BI Tool over the postgres interface on the standard port 5432** (configurable). We have tested with DBeaver, Metabase, Superset, Grafana, and psql.
 
-- Both text and binary encoded fields with extensive type support (time/date formats, JSON, uuid, List/Map/Struct, etc.)
-- Cursor and transaction management
-- Comprehensive pg catalog for metadata discovery
+> DuckDB itself does not have "server mode" and does not implement client-server paradigm. With BoilStream you can run DuckDB efficiently as a server too.
+
+BoilStream supports:
+
+1. 🚀 Both text and binary encoded fields with extensive type support (time/date formats, JSON, uuid, List/Map/Struct, etc.)
+2. 🚀 Cursor and transaction management with DuckDB's native streaming queries
+3. 🚀 Comprehensive pg catalog for metadata discovery from BI Tools with postgres SQL syntax
 
 ## Real-time SQL Streaming - never-ending SQL queries!
 
