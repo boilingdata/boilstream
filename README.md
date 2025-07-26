@@ -20,7 +20,7 @@ BoilStream supports:
 
 This repository contains free download links and docker compose file for running the optional auxiliary services, like Grafana monitoring and Minio S3 for testing.
 
-> \*) There is one data copy from kernel to userspace, which happens always unless you bypass kernel or use e.g. Linux XDP sockets on Linux to read raw data from the link directly. But then you also need to implement TCP, TLS, gRPC, and Flight protocol stacks. Single port/core FlightRPC is already very efficient and reported to support +20GB/s data transfer speeds.
+> \*) There is one data copy from kernel to userspace, which happens always unless you bypass kernel or use e.g. Linux XDP sockets on Linux to read raw data from the link directly. But then you also need to implement TCP, TLS, gRPC, and Flight protocol stacks. Single port/core FlightRPC is already very efficient and reported to support +20GB/s data transfer speeds. In BoilStream, data copying also happens when you convert the incoming Arrow format to Parquet files - but that's all. The concurrent S3 Uploader and pre-allocated buffer pools ensure that the network copy reads from the Parquet writer output buffers directly.
 
 ## No Backups Needed
 
