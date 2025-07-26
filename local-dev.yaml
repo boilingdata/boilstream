@@ -5,8 +5,6 @@
 # AWS Configuration
 aws:
   region: "eu-west-1"
-  # access_key_id: "your-access-key"  # Optional - can use AWS CLI/IAM roles
-  # secret_access_key: "your-secret-key"  # Optional - can use AWS CLI/IAM roles
   https_conn_pool_size: 100
 
 # Storage Configuration
@@ -32,7 +30,7 @@ storage:
       flush_interval_ms: 10000
       max_multipart_object_size: 104857600  # 100 MB
       # DuckLake integration - register files with these catalogs after successful upload
-      ducklake: ["my_ducklake"]
+      #ducklake: ["my_ducklake"]
     # - name: "backup-filesystem"
     #   backend_type: "filesystem"
     #   enabled: true
@@ -45,12 +43,7 @@ storage:
 
 # Server Configuration
 server:
-  valkey_url: "redis://localhost:6379" # Schema registry
-  # tokio_worker_threads: 16  # Optional - defaults to system CPU count
-  flight_thread_count: 1 # One is sufficient for GBs/s throughput
   flight_base_port: 50050 # You basically hit port 50051.
-  admin_flight_port: 50160 # Not in use yet.
-  consumer_flight_port: 50250 # Not in use yet.
   router:
     # SPSC queue capacity per processing thread (number of TopicBatch objects)
     # Controls memory usage: total buffered = spsc_queue_capacity × num_threads × batch_size
@@ -84,59 +77,59 @@ duckdb_persistence:
 
 # DuckLake Configuration for ACID transactions and metadata management
 # Note: Requires DuckLake extension to be available in DuckDB
-ducklake:
-  - name: my_ducklake
-    # Data path where Parquet files are stored (must match storage backend path)
-    # For reconciliation and configuration validation (we don't want to try to parse the SQL to find the data path)
-    data_path: "s3://ingestion-data/"
-    # See https://ducklake.select/docs/stable/duckdb/usage/connecting#parameters
-    attach: |
-      FROM duckdb_secrets();
-      -- Load extensions
-      INSTALL ducklake;
-      INSTALL postgres;
-      INSTALL aws;
-      INSTALL httpfs;
-      LOAD ducklake;
-      LOAD postgres;
-      LOAD aws;
-      LOAD httpfs;
-      -- S3 access for MinIO
-      CREATE OR REPLACE SECRET secretForDirectS3Access (
-          TYPE S3,
-          KEY_ID 'minioadmin',
-          SECRET 'minioadmin',
-          REGION 'us-east-1',
-          ENDPOINT 'localhost:9000',
-          USE_SSL false,
-          URL_STYLE 'path',
-          SCOPE 's3://ingestion-data/'
-      );
-      -- PostgreSQL secret for DuckLake catalog backend
-      CREATE OR REPLACE SECRET postgres (
-        TYPE POSTGRES,
-        HOST 'localhost',
-        PORT 5433,
-        DATABASE 'boilstream',
-        USER 'postgres',
-        PASSWORD 'postgres'
-      );
-      -- DuckLake Postgres catalog
-      CREATE OR REPLACE SECRET pg_secret (
-        TYPE DUCKLAKE,
-        METADATA_PATH '',
-        DATA_PATH 's3://ingestion-data/',
-        METADATA_PARAMETERS MAP {'TYPE': 'postgres', 'SECRET': 'postgres'}
-      );
-      -- DuckLake attachment with Postgres catalog
-      ATTACH 'ducklake:pg_secret' AS my_ducklake;
-    # Optional: Specify which topics to include (if not specified, all topics are included)
-    # topics: ["events", "people"]
-    # Reconciliation settings for ensuring S3 and DuckLake are synchronized
-    reconciliation:
-      on_startup: true                  # Run reconciliation when application starts
-      interval_minutes: 10              # Check for missing files
-      max_concurrent_registrations: 10  # Parallel registration limit
+# ducklake:
+#   - name: my_ducklake
+#     # Data path where Parquet files are stored (must match storage backend path)
+#     # For reconciliation and configuration validation (we don't want to try to parse the SQL to find the data path)
+#     data_path: "s3://ingestion-data/"
+#     # See https://ducklake.select/docs/stable/duckdb/usage/connecting#parameters
+#     attach: |
+#       FROM duckdb_secrets();
+#       -- Load extensions
+#       INSTALL ducklake;
+#       INSTALL postgres;
+#       INSTALL aws;
+#       INSTALL httpfs;
+#       LOAD ducklake;
+#       LOAD postgres;
+#       LOAD aws;
+#       LOAD httpfs;
+#       -- S3 access for MinIO
+#       CREATE OR REPLACE SECRET secretForDirectS3Access (
+#           TYPE S3,
+#           KEY_ID 'minioadmin',
+#           SECRET 'minioadmin',
+#           REGION 'us-east-1',
+#           ENDPOINT 'localhost:9000',
+#           USE_SSL false,
+#           URL_STYLE 'path',
+#           SCOPE 's3://ingestion-data/'
+#       );
+#       -- PostgreSQL secret for DuckLake catalog backend
+#       CREATE OR REPLACE SECRET postgres (
+#         TYPE POSTGRES,
+#         HOST 'localhost',
+#         PORT 5433,
+#         DATABASE 'boilstream',
+#         USER 'postgres',
+#         PASSWORD 'postgres'
+#       );
+#       -- DuckLake Postgres catalog
+#       CREATE OR REPLACE SECRET pg_secret (
+#         TYPE DUCKLAKE,
+#         METADATA_PATH '',
+#         DATA_PATH 's3://ingestion-data/',
+#         METADATA_PARAMETERS MAP {'TYPE': 'postgres', 'SECRET': 'postgres'}
+#       );
+#       -- DuckLake attachment with Postgres catalog
+#       ATTACH 'ducklake:pg_secret' AS my_ducklake;
+#     # Optional: Specify which topics to include (if not specified, all topics are included)
+#     # topics: ["events", "people"]
+#     # Reconciliation settings for ensuring S3 and DuckLake are synchronized
+#     reconciliation:
+#       on_startup: true                  # Run reconciliation when application starts
+#       interval_minutes: 10              # Check for missing files
+#       max_concurrent_registrations: 10  # Parallel registration limit
 
 # PGWire PostgreSQL Protocol Configuration
 pgwire:
@@ -144,14 +137,13 @@ pgwire:
   port: 5432
   username: "boilstream"
   password: "boilstream"
-  refresh_interval_seconds: 6000
+  refresh_interval_seconds: 10
+  # Metadata database location for topic and view management
+  metadata_db_path: "./metadata.duckdb"
   # SQL commands to execute during DuckDB initialization
   # These run once when each database instance is created
   initialization_sql: |
-    INSTALL icu;
-    LOAD icu;
-    PRAGMA enable_logging('QueryLog');
-    SET logging_storage = 'stdout';
+    -- Initialisation commands
   # TLS Configuration for PostgreSQL connections
   tls:
     enabled: false  # Disabled for development
