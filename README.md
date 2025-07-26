@@ -1,6 +1,25 @@
 # BoilStream - Stream to Gold 🏆
 
-BoilStream is both a **high-performance data ingestion** (FlightRPC) and Postgres compatible **real-time (streaming) Analytics** data processing engine as one binary.
+> **NOTE: 2025-07-26: BoilStream v0.6.1 runs DuckDB 1.4.0-pre version and thus extensions installations fail. DuckDB extension interface changes between v1.3 and v1.4 and thus pre-existing extensions can't be installed as they don't work. Once DuckDB v1.4 is out, you can install extensions normally, and then also DuckLake integration works again. We use v1.4.0-pre version because it includes new Arrow C API that is future-proof rather than the v1.3 deprecated one.**
+
+[BoilStream](https://wwww.boilstream.com/) is a small binary DuckDB server with steroids.
+
+Download, start, and connect with any BI Tool with Postgres interface for real-time analytics and [remote DuckDB clients with Airport extension](https://duckdb.org/community_extensions/extensions/airport.html) for high-throughput and scalable real-time data ingestion. It streams Parquet to storage backends like S3 with DuckLake in realtime as compact, hive partitioned Parquet files.
+
+BoilStream supports:
+
+1. 🚀 **High-performance zero-copy data ingestion** (FlightRPC, Arrow) with [DuckDB Airport community extension](https://duckdb.org/community_extensions/extensions/airport.html) from DuckDB clients
+2. 🚀 **Postgres compatible BI interface for real-time (streaming) Analytics** directly 1:1 mapped into DuckDB memory connections
+3. 🚀 **Local on-disk DuckDB database layer** with high ingestion throughput
+4. 🚀 **Multiple Parquet storage backends** like S3 and Filesystem - when DuckDB client FlightRPC `INSERT` returns, **data is guaranteed to be on primary storage** (e.g. Minio or AWS S3)
+5. 🚀 **Creating ingestion topics and materialised realtime views** (derived topics) with special `boilstream.s3` schema - use `CREATE TABLE` and `CREATE TABLE derived_view AS SELECT col1 FROM boilstream.s3.my_topic` for managing topics/views
+6. 🚀 **DuckLake integration:** S3 uploaded files are automatically added to DuckLake
+7. 🚀 **Our novel never-ending DuckDB SQL real-time streaming queries** for processing materialised views very efficiently (see CTAS over `boilstream.s3` schema below)
+8. 🚀 **Enterprise SSO with RBAC/ATAC as well as TLS and improved Postgres authentication** with [paid pro version](https://wwww.boilstream.com/)
+
+This repository contains free download links and docker compose file for running the optional auxiliary services, like Grafana monitoring and Minio S3 for testing.
+
+## No Backups Needed
 
 No backups needed as it streams your data to S3 with automatic compacted and optimised Parquet conversion. Ingested data schema is validated so you don't get bad data in. The data on S3 is ready for analytics and is Hive Partitioned (DuckLake integration also available).
 
@@ -8,17 +27,17 @@ Based on topic configuration, data is also persisted onto local disk as DuckDB d
 
 BoilStream supports thousands of concurrent writers and GBs per second data ingestion rates (with single ingestion port), while using efficient stream aggregation from all the writers into per topic Parquet files. High throughput streaming creates S3 multipart upload files where Parquet row groups are uploaded concurrently (S3 multipart parts). The Parquet file is finalised when size/time threshold is reached.
 
-- 🚀 Use the postgres interface (admin/analytics) to create topics with `CREATE TABLE boilstream.s3.topic` and create forked topics with `CREATE TABLE boilstream.s3.derived_topic AS SELECT..` (aka materialised views). Forked streams are diskless pipelines like the main topics and land on their own S3 prefix with hive partitioning.
-- 🚀 Write efficiently directly from DuckDB with Airport extension (FlightRPC, Arrow, and our zero-copy approach) by just using `INSERT`
-- 🚀 DuckLake integration
+> If you configure S3 as the primary storage and S3 is down, data ingestion stalls and the `INSERT` statements will hang until S3 becomes available again. Data integrity (security) is number one priority. FlightRPC data is also schema validated both on control plane (matching schema) as well as on data plane (actual data matches and validates with the schema).
 
-This repository contains download links to the free tier binary builds and docker compose file for running the optional auxiliary services, like Grafana monitoring and Minio S3 for testing.
+> Secondary storage failures do not affect or stall data ingestion, like if you configure Filesystem as your primary and S3 as secondary.
+
+> Local DuckDB on-disk database persistence layer can be turned on/off and is independent of configured storage layers. You can also configure no Parquet storage layers and just ingest data onto DuckDB on-disk databases (or e.g. EBS volumes on cloud)
 
 ## Postgres interface
 
-**You can run any BI Tool over the postgres interface on the standard port 5432**. We have tested with DBeaver, Metabase, Superset, Grafana, and psql.
+**You can run any BI Tool over the postgres interface on the standard port 5432** (configurable). We have tested with DBeaver, Metabase, Superset, Grafana, and psql. BoilStream uses
 
-- Both text and binary encoded fields with extensive type support (timestamps, JSON, uuid, List/Map/Struct, etc.)
+- Both text and binary encoded fields with extensive type support (time/date formats, JSON, uuid, List/Map/Struct, etc.)
 - Cursor and transaction management
 - Comprehensive pg catalog for metadata discovery
 
@@ -34,7 +53,8 @@ As the data flows in as Arrow data it goes through DuckDB stream processors that
 
 ```bash
 # Download and start boilstream - if no configuration file is provided, it will generate an example one
-curl -L -o boilstream https://www.boilstream.com/binaries/darwin-aarch64/boilstream # Or https://www.boilstream.com/binaries/linux-aarch64/boilstream
+# https://www.boilstream.com/binaries/linux-aarch64/boilstream
+curl -L -o boilstream https://www.boilstream.com/binaries/darwin-aarch64/boilstream
 chmod +x boilstream
 ./boilstream
 ```
@@ -43,7 +63,7 @@ chmod +x boilstream
 
 Connect through the postgres interface with your tool of choice (like psql):
 
-> **The `boilstream.s3.` schema is specific for real-time streaming. Tables created to it become avialable on the FlightRPC side for ingestion. CTAS tables become materialised views (not writable from FlightRPC ingestion side)**
+**The `boilstream.s3.` schema is specific for real-time streaming. Tables created to it become avialable on the FlightRPC side for ingestion. CTAS tables become materialised views (not writable from FlightRPC ingestion side)**
 
 ```sql
 -- Create topic
