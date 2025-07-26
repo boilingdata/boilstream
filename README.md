@@ -4,7 +4,7 @@
 
 [BoilStream](https://wwww.boilstream.com/) is a small binary DuckDB server with steroids.
 
-Download, start, and connect with any BI Tool with Postgres interface for real-time analytics and [remote DuckDB clients with Airport extension](https://duckdb.org/community_extensions/extensions/airport.html) for high-throughput and scalable real-time data ingestion. It streams Parquet to storage backends like S3 with DuckLake in realtime as compact, hive partitioned Parquet files.
+Download, start, and connect with any BI Tool with Postgres interface for real-time analytics - connect from [DuckDB clients with Airport extension](https://duckdb.org/community_extensions/extensions/airport.html) for high-throughput and scalable real-time data ingestion. It streams Parquet to storage backends like S3 with DuckLake in realtime as compact, hive partitioned Parquet files.
 
 BoilStream supports:
 
