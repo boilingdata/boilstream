@@ -15,7 +15,8 @@ BoilStream supports:
 5. 🚀 **Creating ingestion topics and materialised realtime views** (derived topics) with special `boilstream.s3` schema - use `CREATE TABLE` and `CREATE TABLE derived_view AS SELECT col1 FROM boilstream.s3.my_topic` for managing topics/views
 6. 🚀 **DuckLake integration:** S3 uploaded files are automatically added to DuckLake
 7. 🚀 **Our novel never-ending DuckDB SQL real-time streaming queries** for processing materialised views very efficiently (see CTAS over `boilstream.s3` schema below)
-8. 🚀 **Enterprise SSO with RBAC/ATAC as well as TLS and improved Postgres authentication** with [paid pro version](https://wwww.boilstream.com/)
+8. 🚀 **Monitoring through prometheus compatible interface** along with an example Grafana Dashboard (see [`docker-compose.yml`](docker-compose.yml))
+9. 🚀 **Enterprise SSO with RBAC/ATAC as well as TLS and improved Postgres authentication** with [paid pro version](https://wwww.boilstream.com/)
 
 This repository contains free download links and docker compose file for running the optional auxiliary services, like Grafana monitoring and Minio S3 for testing.
 
@@ -59,7 +60,7 @@ chmod +x boilstream
 ./boilstream
 ```
 
-> _You can use the accompanying docker-compose.yaml file to start auxiliary containers for Grafana Dashboard and S3 Minio_
+> _You can use the accompanying docker-compose.yml file to start auxiliary containers for Grafana Dashboard and S3 Minio_
 
 Connect through the postgres interface with your tool of choice (like psql):
 
