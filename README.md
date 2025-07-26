@@ -33,15 +33,13 @@ As the data flows in as Arrow data it goes through DuckDB stream processors that
 ## Start
 
 ```bash
+# Download and start boilstream - if no configuration file is provided, it will generate an example one
 curl -L -o boilstream https://www.boilstream.com/binaries/darwin-aarch64/boilstream # Or https://www.boilstream.com/binaries/linux-aarch64/boilstream
 chmod +x boilstream
-
-# Start boilstream, if no configuration file is provided, it will generate an example one
 ./boilstream
-
-# OPTIONAL: Start auxiliary containers (Grafana, Minio, Superset)
-docker-compose up -d
 ```
+
+> _You can use the accompanying docker-compose.yaml file to start auxiliary containers for Grafana Dashboard and S3 Minio_
 
 Connect through the postgres interface with your tool of choice (like psql):
 
