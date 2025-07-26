@@ -1,6 +1,6 @@
 # BoilStream - Stream to Gold Easily 🏆
 
-> **NOTE: 2025-07-26: BoilStream v0.6.1 runs DuckDB 1.4.0-pre version and thus extensions installations fail. DuckDB extension interface changes between v1.3 and v1.4 and thus pre-existing extensions can't be installed as they don't work. Once DuckDB v1.4 is out, you can install extensions normally, and then also DuckLake integration works again. We use v1.4.0-pre version because it includes new Arrow C API that is future-proof rather than the v1.3 deprecated one.**
+> **NOTE: 2025-07-26: BoilStream v0.6.1 runs DuckDB 1.4.0-pre version and thus extensions installations fail. DuckDB extension interface changes between v1.3 and v1.4 and thus pre-existing extensions can't be installed as they don't work. Once DuckDB v1.4 is out and extensions start to be compiled for it, you can install them normally, and then also DuckLake integration works again. We use v1.4.0-pre version because it includes new Arrow C API that is future-proof rather than the v1.3 deprecated one.**
 
 [BoilStream](https://wwww.boilstream.com/) is a small binary DuckDB server with steroids written in Rust (and a bit of C++).
 
@@ -20,7 +20,7 @@ BoilStream supports:
 
 This repository contains free download links and docker compose file for running the optional auxiliary services, like Grafana monitoring and Minio S3 for testing.
 
-> \*) There is one data copy from kernel to userspace, which happens always unless you bypass kernel or use e.g. Linux XDP sockets on Linux to read raw data from the link directly. But then you also need to implement TCP, TLS, gRPC, and Flight protocol stacks. Single port/core FlightRPC is already very efficient and reported to support +20GB/s data transfer speeds. In BoilStream, data copying also happens when you convert the incoming Arrow format to Parquet files - but that's all. The concurrent S3 Uploader and pre-allocated buffer pools ensure that the network copy reads from the Parquet writer output buffers directly.
+> \*) There is one data copy from kernel to userspace, which happens always unless you bypass kernel or use e.g. Linux XDP sockets to read raw data from the link directly. But then you also need to parse Ethernet and implement IP, TCP, TLS, gRPC, and Flight protocol stacks. Single port/core FlightRPC is already very efficient and reported to support +20GB/s data transfer speeds. In BoilStream, data copying also happens when you convert the incoming Arrow format to Parquet files - but that's all. The concurrent S3 Uploader and pre-allocated buffer pools ensure that the network copy reads from the Parquet writer output buffers directly.
 
 ## No Backups Needed
 
@@ -35,6 +35,8 @@ BoilStream supports thousands of concurrent writers and GBs per second data inge
 > Secondary storage failures do not affect or stall data ingestion, like if you configure Filesystem as your primary and S3 as secondary.
 
 > Local DuckDB on-disk database persistence layer can be turned on/off and is independent of configured storage layers. You can also configure no Parquet storage layers and just ingest data onto DuckDB on-disk databases (or e.g. EBS volumes on cloud)
+
+> 2025-07-26: Currently, there is no DuckDB on-disk database file rotation or old data cleanup, but we will address this in the future release to avoid the common disk full scenario. For now, you can periodically delete old data.
 
 ## Postgres interface
 
