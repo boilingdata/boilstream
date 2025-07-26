@@ -1,4 +1,4 @@
-# BoilStream - Stream to Gold Now 🏆
+# BoilStream - Stream to Gold Easily 🏆
 
 > **NOTE: 2025-07-26: BoilStream v0.6.1 runs DuckDB 1.4.0-pre version and thus extensions installations fail. DuckDB extension interface changes between v1.3 and v1.4 and thus pre-existing extensions can't be installed as they don't work. Once DuckDB v1.4 is out, you can install extensions normally, and then also DuckLake integration works again. We use v1.4.0-pre version because it includes new Arrow C API that is future-proof rather than the v1.3 deprecated one.**
 
