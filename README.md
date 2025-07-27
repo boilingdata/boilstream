@@ -122,6 +122,10 @@ INSERT INTO boilstream.s3.people
 - **No authentication**: No authentication or access control
 - **No TLS**: Runs on plain FlightRPC connection without TLS
 
+## 📋 Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for version history and release notes.
+
 ## 🏗️ Architecture
 
 For complete documentation, visit: **[www.boilstream.com](https://www.boilstream.com)** and **[docs.boilstream.com](https://docs.boilstream.com)**
