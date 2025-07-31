@@ -84,6 +84,15 @@ CREATE TABLE boilstream.s3.filtered_b AS SELECT * FROM boilstream.s3.people WHER
 CREATE TABLE boilstream.s3.filtered_a AS SELECT * FROM boilstream.s3.people WHERE name LIKE 'a%';
 ```
 
+Check existing topics and their metadata:
+
+```sql
+-- topic metadata
+select * from boilstream.topics;
+select * from boilstream.topic_schemas;
+select * from boilstream.derived_views;
+```
+
 Start ingesting data with DuckDB. **When DuckDB statement returns, data is guaranteed to be on S3!**
 
 ```sql
