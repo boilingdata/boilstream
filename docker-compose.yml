@@ -102,7 +102,35 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
+  superset:
+    image: apache/superset:latest
+    container_name: superset
+    restart: unless-stopped
+    ports:
+      - "8088:8088"
+    environment:
+      - SUPERSET_SECRET_KEY=your_secret_key_here_change_this_to_something_secure
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - superset_home:/app/superset_home
+    command: >
+      bash -c "
+        pip install psycopg2-binary &&
+        superset fab create-admin 
+          --username admin 
+          --firstname Superset 
+          --lastname Admin 
+          --email admin@superset.com 
+          --password admin &&
+        superset db upgrade &&
+        superset init &&
+        superset run -p 8088 --with-threads --reload --debugger --host=0.0.0.0
+      "
+
 volumes:
+  superset_home:
+    driver: local
   minio_data:
     driver: local
   prometheus_data:
