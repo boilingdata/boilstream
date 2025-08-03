@@ -64,6 +64,7 @@ As the data flows in as Arrow data it goes through DuckDB stream processors that
 # Download and start boilstream - if no configuration file is provided, it will generate an example one
 # https://www.boilstream.com/binaries/linux-aarch64/boilstream
 # https://www.boilstream.com/binaries/linux-x64/boilstream
+# https://www.boilstream.com/binaries/darwin-x64/boilstream
 curl -L -o boilstream https://www.boilstream.com/binaries/darwin-aarch64/boilstream
 chmod +x boilstream
 ./boilstream
