@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The metadata.duckdb database catalog schema changed (keying by u64 not varchar)
 - improved memory management with vector recycling, also switched from jemalloc to mimalloc
 - Embedded DuckDB now has more inbuilt core extensions
-- Linux x64 build
+- Linux and OSX x64 builds
 
 ### Fixed
 
