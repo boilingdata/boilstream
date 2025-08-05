@@ -40,7 +40,7 @@ BoilStream supports thousands of concurrent writers and GBs per second data inge
 
 ## Postgres interface
 
-**You can run any BI Tool over the postgres interface on the standard port 5432** (configurable). We have tested with Power BI, DBeaver, Metabase, Superset, Grafana, and psql.
+**You can run any BI Tool over the postgres interface on the standard port 5432** (configurable). We have tested with Power BI, DBeaver, Metabase, Superset, Grafana, psql, pgbench.
 
 > DuckDB itself does not have "server mode" and does not implement client-server paradigm. With BoilStream you can run DuckDB efficiently as a server too.
 
