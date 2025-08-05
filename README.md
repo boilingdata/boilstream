@@ -67,7 +67,8 @@ As the data flows in as Arrow data it goes through DuckDB stream processors that
 # https://www.boilstream.com/binaries/darwin-x64/boilstream
 curl -L -o boilstream https://www.boilstream.com/binaries/darwin-aarch64/boilstream
 chmod +x boilstream
-./boilstream
+# SERVER_IP_ADDRESS is used on the Flight interface, use reachable IP address
+SERVER_IP_ADDRESS=1.2.3.4 ./boilstream
 ```
 
 > _You can use the accompanying docker-compose.yml file to start auxiliary containers for Grafana Dashboard and S3 Minio_
