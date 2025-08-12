@@ -66,6 +66,9 @@ As the data flows in as Arrow data it goes through DuckDB stream processors that
 # https://www.boilstream.com/binaries/linux-x64/boilstream
 # https://www.boilstream.com/binaries/darwin-x64/boilstream
 curl -L -o boilstream https://www.boilstream.com/binaries/darwin-aarch64/boilstream
+# NOTE: Before next release of DuckDB with updated extension interface, you can use this pre-compiled
+#       extension, or compile your own at: https://github.com/Query-farm/airport
+curl -L -o /tmp/airport.duckdb_extension https://www.boilstream.com/binaries/darwin-aarch64/airport.duckdb_extension
 chmod +x boilstream
 # SERVER_IP_ADDRESS is used on the Flight interface, use reachable IP address
 SERVER_IP_ADDRESS=1.2.3.4 ./boilstream
@@ -73,7 +76,9 @@ SERVER_IP_ADDRESS=1.2.3.4 ./boilstream
 
 > _You can use the accompanying docker-compose.yml file to start auxiliary containers for Grafana Dashboard and S3 Minio_
 
-Connect through the postgres interface with your tool of choice (like psql):
+Connect through the postgres interface with your tool of choice, like [DBeaver](https://dbeaver.io/download/) that we have been extensively using.
+
+- See the [workbook.sql](workbook.sql) for full example.
 
 **The `boilstream.s3.` schema is specific for real-time streaming. Tables created to it become avialable on the FlightRPC side for ingestion. CTAS tables become materialised views (not writable from FlightRPC ingestion side)**
 
@@ -96,7 +101,28 @@ select * from boilstream.topic_schemas;
 select * from boilstream.derived_views;
 ```
 
-Start ingesting data with DuckDB. **When DuckDB statement returns, data is guaranteed to be on S3!**
+`ATTACH` BoilStream topics write end point to itself.
+
+> BoilStream can attach itself (has actually in-built Airport extension), but also other BoilStream servers or other Airport servers (FlightRPC `do_exchange` method)
+
+```sql
+LOAD '/tmp/airport.duckdb_extension';
+SELECT extension_name, loaded from duckdb_extensions() where loaded=true;
+ATTACH 'boilstream' AS data (TYPE AIRPORT, location 'grpc://localhost:50051/');
+SHOW ALL TABLES;
+-- Write into "people" topic
+INSERT INTO data.s3.people
+   SELECT
+      'boilstream_' || i::VARCHAR AS name,
+      (i % 100) + 1 AS age,
+      ['duckdb', 'ducklake'] AS tags
+   FROM generate_series(1, 20000) as t(i);
+
+```
+
+### With remote DuckDB clients
+
+Start ingesting data with DuckDB clients. **When DuckDB statement returns, data is guaranteed to be on S3!**
 
 ```sql
 INSTALL airport FROM community;

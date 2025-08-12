@@ -5,12 +5,23 @@ All notable changes to BoilStream will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.7.2] - 2025-08-?? -- TO BE RELEASED
+## [0.7.3] - 2025-08-??
 
 ### Features
 
-- Flight SQL interface
-- Self and cross-BoilStream writes with Airport extension
+- Support for GCP and Azure object storages
+
+## [0.7.2] - 2025-08-12
+
+### Features
+
+- Flight SQL interface (e.g. with ADBC drivers)
+- Self and cross-BoilStream writes with Airport extension (pre-compiled downloadable)
+
+### Fixed
+
+- Graceful shutdown sequence fixed to avoid data loss with derived view processor
+- Derived topic id assignment and topic cache miss handling
 
 ## [0.7.1] - 2025-08-04
 
