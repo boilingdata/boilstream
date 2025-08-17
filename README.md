@@ -74,8 +74,12 @@ chmod +x boilstream
 SERVER_IP_ADDRESS=1.2.3.4 ./boilstream
 
 # You can also use Docker images:
-docker run -v ./config.yaml:/app/config.yaml -e SERVER_IP_ADDRESS=1.2.3.4 boilinginsights/boilstream:aarch64-linux
-docker run -v ./config.yaml:/app/config.yaml -e SERVER_IP_ADDRESS=1.2.3.4 boilinginsights/boilstream:x64-linux
+# boilinginsights/boilstream:x64-linux or boilinginsights/boilstream:aarch64-linux
+docker run -v ./config.yaml:/app/config.yaml \
+   -p 5432:5432 \
+   -p 50250:50250 \
+   -p 50051:50051 \
+   -e SERVER_IP_ADDRESS=1.2.3.4 boilinginsights/boilstream:aarch64-linux
 ```
 
 > _You can use the accompanying docker-compose.yml file to start auxiliary containers for Grafana Dashboard and S3 Minio_
