@@ -4,11 +4,11 @@
 
 [BoilStream](https://wwww.boilstream.com/) is a small binary DuckDB server with steroids written in Rust (and a bit of C++).
 
-Download, start, and connect with any BI Tool with Postgres interface for real-time analytics - connect from [DuckDB clients with Airport extension](https://duckdb.org/community_extensions/extensions/airport.html) for high-throughput and scalable real-time data ingestion. It streams Parquet to storage backends like S3 with DuckLake in realtime as compact, hive partitioned Parquet files.
+Download, start, and connect with any BI Tool with Postgres interface for real-time analytics - connect from [DuckDB clients with Airport extension](https://duckdb.org/community_extensions/extensions/airport.html) (and generally with FlightSQL) for high-throughput and scalable real-time data ingestion. It streams Parquet to storage backends like S3 with DuckLake in realtime as compact, hive partitioned Parquet files.
 
 BoilStream supports:
 
-1. 🚀 **High-performance zero-copy\* data ingestion** (FlightRPC, Arrow) with [DuckDB Airport community extension](https://duckdb.org/community_extensions/extensions/airport.html) from DuckDB clients
+1. 🚀 **High-performance zero-copy\* data ingestion** (FlightRPC, FlightSQL, Arrow) with [DuckDB Airport community extension](https://duckdb.org/community_extensions/extensions/airport.html) from DuckDB clients
 2. 🚀 **Postgres compatible BI interface for real-time (streaming) Analytics** directly 1:1 mapped into DuckDB memory connections
 3. 🚀 **Local on-disk DuckDB database layer** with high ingestion throughput
 4. 🚀 **Multiple "diskless" Parquet storage backends** like S3 and Filesystem - when DuckDB client FlightRPC `INSERT` returns, **data is guaranteed to be on primary storage** (e.g. Minio or AWS S3). The data pipeline to S3 is completely diskless, so if you don't enable DuckDB local persistence layer, the disk is not used at all.
@@ -20,7 +20,7 @@ BoilStream supports:
 
 This repository contains free download links and docker compose file for running the optional auxiliary services, like Grafana monitoring and Minio S3 for testing.
 
-> \*) There is one data copy from kernel to userspace, which happens always unless you bypass kernel or use e.g. Linux XDP sockets to read raw data from the link directly. But then you also need to parse Ethernet and implement IP, TCP, TLS, gRPC, and Flight protocol stacks. Single port/core FlightRPC is already very efficient and reported to support +20GB/s data transfer speeds. In BoilStream, data copying also happens when you convert the incoming Arrow format to Parquet files - but that's all. The concurrent S3 Uploader and pre-allocated buffer pools ensure that the network copy reads from the Parquet writer output buffers directly.
+> \*) There is one data copy from kernel to userspace, which happens always unless you bypass kernel or use e.g. Linux XDP sockets to read raw data from the link directly. But then you also need to parse Ethernet and implement IP, TCP, TLS, gRPC, and Flight protocol stacks. Single port/core FlightRPC is already very efficient and reported to support +20GB/s data transfer speeds with single core. In BoilStream, data copying also happens when you convert the incoming Arrow format to Parquet files or to DuckDB on-disk database file - but that's all. The concurrent S3 Uploader and pre-allocated buffer pools ensure that the network copy reads from the Parquet writer output buffers directly. We even rotate the envelope vectors that carry the metadata along with the data references.
 
 ## No Backups Needed
 
@@ -88,7 +88,7 @@ Connect through the postgres interface with your tool of choice, like [DBeaver](
 
 - See the [workbook.sql](workbook.sql) for full example.
 
-**The `boilstream.s3.` schema is specific for real-time streaming. Tables created to it become avialable on the FlightRPC side for ingestion. CTAS tables become materialised views (not writable from FlightRPC ingestion side)**
+**The `boilstream.s3.` schema is specific for real-time streaming. Tables created to it become available on the FlightRPC side for ingestion. CTAS tables become materialised views (not writable from FlightRPC ingestion side)**
 
 ```sql
 -- Create topic
