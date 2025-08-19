@@ -62,10 +62,10 @@ As the data flows in as Arrow data it goes through DuckDB stream processors that
 
 ```bash
 # Download and start boilstream - if no configuration file is provided, it will generate an example one
-# https://www.boilstream.com/binaries/linux-aarch64/boilstream-0.7.3
-# https://www.boilstream.com/binaries/linux-x64/boilstream-0.7.3
-# https://www.boilstream.com/binaries/darwin-x64/boilstream-0.7.3
-curl -L -o boilstream https://www.boilstream.com/binaries/darwin-aarch64/boilstream-0.7.3
+# https://www.boilstream.com/binaries/linux-aarch64/boilstream-0.7.4
+# https://www.boilstream.com/binaries/linux-x64/boilstream-0.7.4
+# https://www.boilstream.com/binaries/darwin-x64/boilstream-0.7.4
+curl -L -o boilstream https://www.boilstream.com/binaries/darwin-aarch64/boilstream-0.7.4
 # NOTE: Before next release of DuckDB with updated extension interface, you can use this pre-compiled
 #       extension, or compile your own at: https://github.com/Query-farm/airport
 curl -L -o /tmp/airport.duckdb_extension https://www.boilstream.com/binaries/darwin-aarch64/airport.duckdb_extension
@@ -74,12 +74,12 @@ chmod +x boilstream
 SERVER_IP_ADDRESS=1.2.3.4 ./boilstream
 
 # You can also use Docker images:
-# boilinginsights/boilstream:x64-linux-0.7.3 or boilinginsights/boilstream:aarch64-linux-0.7.3
+# boilinginsights/boilstream:x64-linux-0.7.4 or boilinginsights/boilstream:aarch64-linux-0.7.4
 docker run -v ./config.yaml:/app/config.yaml \
    -p 5432:5432 \
    -p 50250:50250 \
    -p 50051:50051 \
-   -e SERVER_IP_ADDRESS=1.2.3.4 boilinginsights/boilstream:aarch64-linux-0.7.3
+   -e SERVER_IP_ADDRESS=1.2.3.4 boilinginsights/boilstream:aarch64-linux-0.7.4
 ```
 
 > _You can use the accompanying docker-compose.yml file to start auxiliary containers for Grafana Dashboard and S3 Minio_
