@@ -1,10 +1,47 @@
 -- -------------------------------------
 -- Load Airport extension
+-- curl -L -o /tmp/airport.duckdb_extension https://www.boilstream.com/binaries/darwin-aarch64/airport.duckdb_extension
 load '/tmp/airport.duckdb_extension';
 select extension_name, loaded from duckdb_extensions() where loaded=true;
 
 SELECT function_name FROM duckdb_functions() WHERE function_name LIKE 'airport%';
 SELECT airport_version(), airport_user_agent();
+
+-- NYC Yellow Taxi rides
+CREATE TABLE boilstream.s3.nyc(
+	VendorID INTEGER,
+	tpep_pickup_datetime TIMESTAMP, 
+	tpep_dropoff_datetime TIMESTAMP, 
+	passenger_count BIGINT, 
+	trip_distance DOUBLE, 
+	RatecodeID BIGINT, 
+	store_and_fwd_flag VARCHAR, 
+	PULocationID INTEGER, 
+	DOLocationID INTEGER, 
+	payment_type BIGINT, 
+	fare_amount DOUBLE, 
+	extra DOUBLE, 
+	mta_tax DOUBLE, 
+	tip_amount DOUBLE, 
+	tolls_amount DOUBLE, 
+	improvement_surcharge DOUBLE, 
+	total_amount DOUBLE, 
+	congestion_surcharge DOUBLE, 
+	Airport_fee DOUBLE, 
+	cbd_congestion_fee double
+);
+
+-- Attach boilstream ingestion port into itself, so you can write to it with SQL
+ATTACH 'boilstream' as data (TYPE AIRPORT, location 'grpc://localhost:50051/');
+-- Download NYC Yellow Taxi tripdata parquet files from Internet and ingest them through BoilStream
+insert into data.s3.nyc	select * from parquet_scan('yellow_tripdata_2025-*.parquet');
+-- BoilStream will create a VIEW over the nyc table / topic, once it gets data and you have DuckDB 
+-- local persistence enabled (i.e. on-disk caching into DuckDB databases)
+-- The Postgres interface connects directly to BoilStream in-memory DuckDB database that has
+-- real-time view over the ingested data, while also enabling concurrent writers and readers.
+select COUNT(*) from nyc;
+select * from nyc order by passenger_count asc limit 10;
+
 
 -- Streaming Topic metadata (catalog)
 -- The "topics" table is visible for DuckDB Airport clients along 
@@ -50,6 +87,8 @@ select COUNT(*), age from people group by age limit 100;
 
 -- -------------------------------------
 -- Postgres Interface Types testing
+-- For complete and extensive type testing, see demo_database.sql
+-- It fully works with Power BI
 CREATE TABLE IF NOT EXISTS psql_decimal128_test AS 
 	SELECT i AS id, CAST(i * 3.14 AS DECIMAL(22,2)) AS value FROM range(5) t(i);
 
