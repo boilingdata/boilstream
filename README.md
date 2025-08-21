@@ -86,7 +86,8 @@ docker run -v ./config.yaml:/app/config.yaml \
 
 Connect through the postgres interface with your tool of choice, like [DBeaver](https://dbeaver.io/download/) that we have been extensively using.
 
-- See the [workbook.sql](workbook.sql) for full example.
+- See the [workbook.sql](workbook.sql) for full example
+- See the [demo_database.sql](demo_database.sql) for extensive type testing example, which we used with Power BI testing
 
 **The `boilstream.s3.` schema is specific for real-time streaming. Tables created to it become available on the FlightRPC side for ingestion. CTAS tables become materialised views (not writable from FlightRPC ingestion side)**
 
