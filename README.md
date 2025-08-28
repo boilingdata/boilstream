@@ -9,7 +9,7 @@ Download, start, and connect with any BI Tool with Postgres interface for real-t
 BoilStream supports:
 
 1. 🚀 **High-performance zero-copy\* data ingestion** (FlightRPC, FlightSQL, Arrow) with [DuckDB Airport community extension](https://duckdb.org/community_extensions/extensions/airport.html) from DuckDB clients
-2. 🚀 **Postgres compatible BI interface for real-time (streaming) Analytics** directly 1:1 mapped into DuckDB memory connections
+2. 🚀 **Postgres compatible BI interface for real-time (streaming) Analytics** directly 1:1 mapped into DuckDB memory connections, see also [type compliance report](https://www.boilstream.com/type_coverage_report.md)
 3. 🚀 **Local on-disk DuckDB database layer** with high ingestion throughput
 4. 🚀 **Multiple "diskless" Parquet storage backends** like S3 and Filesystem - when DuckDB client FlightRPC `INSERT` returns, **data is guaranteed to be on primary storage** (e.g. Minio or AWS S3). The data pipeline to S3 is completely diskless, so if you don't enable DuckDB local persistence layer, the disk is not used at all.
 5. 🚀 **Creating ingestion topics and materialised realtime views** (derived topics) with special `boilstream.s3` schema - use `CREATE TABLE` and `CREATE TABLE derived_view AS SELECT col1 FROM boilstream.s3.my_topic` for managing topics/views
@@ -149,7 +149,7 @@ INSERT INTO boilstream.s3.people
    FROM generate_series(1, 20000) as t(i);
 ```
 
-> The BoilStream configuration file `storage.backends.flush_interval_ms` (with fbackend type "s3") configuration option defines the S3 synchronization interval, which also completes the DuckDB INSERT transactions you run with the Airport extension from all the clients. The smaller the flush interval, the faster response times you get, but smaller fragmented Parquet files. You can send millions of rows or just one row and the query completes in these intervals as the storage backend signals all verifiably (S3) stored sequence numbers onto Parquet back to the data ingestion frontend which ensures that all data is successfully stored on S3 before returning success back to Airport clients.
+> The BoilStream configuration file `storage.backends.flush_interval_ms` (with backend type "s3") configuration option defines the S3 synchronization interval, which also completes the DuckDB INSERT transactions you run with the Airport extension from all the clients. The smaller the flush interval, the faster response times you get, but smaller fragmented Parquet files. You can send millions of rows or just one row and the query completes in these intervals as the storage backend signals all verifiably (S3) stored sequence numbers onto Parquet back to the data ingestion frontend which ensures that all data is successfully stored on S3 before returning success back to Airport clients.
 
 **Monitor your data with Grafana**: http://localhost:3000 (admin/admin)
 

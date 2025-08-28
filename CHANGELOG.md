@@ -5,6 +5,21 @@ All notable changes to BoilStream will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.7] - 2025-08-27
+
+### Features
+
+- Improved Postgres interface robustness and resource management (query timeouts, idle connection mgmt, etc.)
+- Postgres interface result row record improvements and type modifiers for allowing Power BI to use proper query folding (query pushdown)
+- Type compliance report: https://www.boilstream.com/type_coverage_report.md
+- Grafana Dashboard updated with more metrics
+- NEW: Preliminary Kafka interface with Avro and schema validation. The boilstream.topic_schemas now also include avro_schema column that is the schema for Kafka clients.
+
+### Fixes
+
+- Storage backend now supports multiple Object Storage backends, not just e.g. S3 + filesystem
+- By default having DuckDB arrow_lossless_conversion = true (preserves e.g. time zone information with "tiem with time zone" type). Both settings works.
+
 ## [0.7.6] - 2025-08-21
 
 ### Features
