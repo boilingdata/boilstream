@@ -50,6 +50,10 @@ BoilStream supports:
 2. 🚀 Cursor and transaction management with DuckDB's native streaming queries
 3. 🚀 Comprehensive pg catalog for metadata discovery from BI Tools with postgres SQL syntax
 
+## Kafka interface
+
+BoilStream has Confluent Schema with Avro data format Kafka interface support. Stream in data with Kafka by using the same topics/tables as with FlightRPC/FlightSQL. The same schema table has both arrow and avro schemas.
+
 ## Real-time SQL Streaming - never-ending SQL queries!
 
 We use our _innovative never ending continuous stream processing with DuckDB_ 🚀 . This avoids SQL parsing, Arrow Table registration, cleanup and other hassle present (micro) batch processing approaches.
