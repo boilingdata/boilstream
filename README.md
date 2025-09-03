@@ -9,7 +9,7 @@ Download, start, and connect with any BI Tool with Postgres interface for real-t
 BoilStream supports:
 
 1. 🚀 **High-performance zero-copy\* data ingestion** (FlightRPC, FlightSQL, Arrow) with [DuckDB Airport community extension](https://duckdb.org/community_extensions/extensions/airport.html) from DuckDB clients
-2. 🚀 **Postgres compatible BI interface for real-time (streaming) Analytics** directly 1:1 mapped into DuckDB memory connections, see also [type compliance report](https://www.boilstream.com/type_coverage_report.md)
+2. 🚀 **Postgres compatible BI interface for real-time (streaming) Analytics** directly 1:1 mapped into DuckDB memory connections, see also [type compliance report](https://boilstream.com/test_report.html)
 3. 🚀 **Local on-disk DuckDB database layer** with high ingestion throughput
 4. 🚀 **Multiple "diskless" Parquet storage backends** like S3 and Filesystem - when DuckDB client FlightRPC `INSERT` returns, **data is guaranteed to be on primary storage** (e.g. Minio or AWS S3). The data pipeline to S3 is completely diskless, so if you don't enable DuckDB local persistence layer, the disk is not used at all.
 5. 🚀 **Creating ingestion topics and materialised realtime views** (derived topics) with special `boilstream.s3` schema - use `CREATE TABLE` and `CREATE TABLE derived_view AS SELECT col1 FROM boilstream.s3.my_topic` for managing topics/views
@@ -62,10 +62,10 @@ As the data flows in as Arrow data it goes through DuckDB stream processors that
 
 ```bash
 # Download and start boilstream - if no configuration file is provided, it will generate an example one
-# https://www.boilstream.com/binaries/linux-aarch64/boilstream-0.7.6
-# https://www.boilstream.com/binaries/linux-x64/boilstream-0.7.6
-# https://www.boilstream.com/binaries/darwin-x64/boilstream-0.7.6
-curl -L -o boilstream https://www.boilstream.com/binaries/darwin-aarch64/boilstream-0.7.6
+# https://www.boilstream.com/binaries/linux-aarch64/boilstream-0.7.9
+# https://www.boilstream.com/binaries/linux-x64/boilstream-0.7.9
+# https://www.boilstream.com/binaries/darwin-x64/boilstream-0.7.9
+curl -L -o boilstream https://www.boilstream.com/binaries/darwin-aarch64/boilstream-0.7.9
 # NOTE: Before next release of DuckDB with updated extension interface, you can use this pre-compiled
 #       extension, or compile your own at: https://github.com/Query-farm/airport
 curl -L -o /tmp/airport.duckdb_extension https://www.boilstream.com/binaries/darwin-aarch64/airport.duckdb_extension
@@ -74,12 +74,12 @@ chmod +x boilstream
 SERVER_IP_ADDRESS=1.2.3.4 ./boilstream
 
 # You can also use Docker images:
-# boilinginsights/boilstream:x64-linux-0.7.6 or boilinginsights/boilstream:aarch64-linux-0.7.6
+# boilinginsights/boilstream:x64-linux-0.7.9 or boilinginsights/boilstream:aarch64-linux-0.7.9
 docker run -v ./config.yaml:/app/config.yaml \
    -p 5432:5432 \
    -p 50250:50250 \
    -p 50051:50051 \
-   -e SERVER_IP_ADDRESS=1.2.3.4 boilinginsights/boilstream:aarch64-linux-0.7.6
+   -e SERVER_IP_ADDRESS=1.2.3.4 boilinginsights/boilstream:aarch64-linux-0.7.9
 ```
 
 > _You can use the accompanying docker-compose.yml file to start auxiliary containers for Grafana Dashboard and S3 Minio_
