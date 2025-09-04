@@ -8,7 +8,7 @@ Download, start, and connect with any BI Tool with Postgres interface for real-t
 
 BoilStream supports:
 
-1. 🚀 **High-performance zero-copy\* data ingestion** (FlightRPC, FlightSQL, Arrow) with [DuckDB Airport community extension](https://duckdb.org/community_extensions/extensions/airport.html) from DuckDB clients
+1. 🚀 **High-performance zero-copy\* data ingestion** (Kafka (avro with schema), FlightRPC, FlightSQL, Arrow) with [DuckDB Airport community extension](https://duckdb.org/community_extensions/extensions/airport.html) from DuckDB clients
 2. 🚀 **Postgres compatible BI interface for real-time (streaming) Analytics** directly 1:1 mapped into DuckDB memory connections, see also [type compliance report](https://boilstream.com/test_report.html)
 3. 🚀 **Local on-disk DuckDB database layer** with high ingestion throughput
 4. 🚀 **Multiple "diskless" Parquet storage backends** like S3 and Filesystem - when DuckDB client FlightRPC `INSERT` returns, **data is guaranteed to be on primary storage** (e.g. Minio or AWS S3). The data pipeline to S3 is completely diskless, so if you don't enable DuckDB local persistence layer, the disk is not used at all.
@@ -41,6 +41,8 @@ BoilStream supports thousands of concurrent writers and GBs per second data inge
 ## Postgres interface
 
 **You can run any BI Tool over the postgres interface on the standard port 5432** (configurable). We have tested with Power BI, DBeaver, Metabase, Superset, Grafana, psql, pgbench.
+
+You can see our type compliance report online at [https://boilstream.com/test_report.html](https://boilstream.com/test_report.html)
 
 > DuckDB itself does not have "server mode" and does not implement client-server paradigm. With BoilStream you can run DuckDB efficiently as a server too.
 
