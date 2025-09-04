@@ -5,6 +5,12 @@ All notable changes to BoilStream will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.10] - 2025-09-04
+
+### Fixes
+
+- PG type name mapping vs native type naming fixed for allowing Power BI to detect all types properly
+
 ## [0.7.9] - 2025-09-03
 
 ### Features
@@ -13,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Higher resiliency against attacks and hundreds of concurrent clients, including malicious
 - Improved type compliancy HTML report: https://boilstream.com/test_report.html
 
-###
+### Fixes
 
 - Many PG catalog fixes to make type system more complete
 
