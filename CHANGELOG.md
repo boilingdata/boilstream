@@ -5,6 +5,17 @@ All notable changes to BoilStream will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.11] - 2025-09-04
+
+### Features
+
+- True streaming through postgres interface with lazy fetching from DuckDB to minimise memory consumption. Allows e.g. streaming tens of millions of rows concurrently to multiple clients without consuming much memory.
+- Allow streaming all rows, not just first 1M. Allows e.g. Power BI to download all data.
+
+### Fixes
+
+- Fix "time with time zone", "timestamp with time zone", "uuid array", "boolean array" binary parameters handling for prepared queries
+
 ## [0.7.10] - 2025-09-04
 
 ### Fixes
