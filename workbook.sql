@@ -1,8 +1,7 @@
 -- -------------------------------------
 -- Load Airport extension
--- curl -L -o /tmp/airport.duckdb_extension https://www.boilstream.com/binaries/darwin-aarch64/airport.duckdb_extension
-load '/tmp/airport.duckdb_extension';
-select extension_name, loaded from duckdb_extensions() where loaded=true;
+INSTALL airport;
+LOAD airport;
 
 SELECT function_name FROM duckdb_functions() WHERE function_name LIKE 'airport%';
 SELECT airport_version(), airport_user_agent();

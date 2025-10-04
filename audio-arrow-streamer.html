@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Arrow Streamer</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #e0e0e0;
+        }
+        .container {
+            background: #2a2a2a;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #4a9eff;
+            margin-bottom: 30px;
+        }
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 600;
+        }
+        .start {
+            background: #4a9eff;
+            color: white;
+        }
+        .start:hover {
+            background: #3a8eef;
+        }
+        .stop {
+            background: #ff4a4a;
+            color: white;
+        }
+        .stop:hover {
+            background: #ef3a3a;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            font-family: 'Courier New', monospace;
+        }
+        .status.idle {
+            background: #333;
+            color: #888;
+        }
+        .status.running {
+            background: #1a4a1a;
+            color: #4aff4a;
+        }
+        .status.error {
+            background: #4a1a1a;
+            color: #ff4a4a;
+        }
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .metric {
+            background: #333;
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+        }
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #4a9eff;
+        }
+        .metric-label {
+            font-size: 14px;
+            color: #888;
+            margin-top: 5px;
+        }
+        .config {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #333;
+            border-radius: 6px;
+        }
+        .config-item {
+            margin-bottom: 10px;
+        }
+        .config-item label {
+            display: inline-block;
+            width: 150px;
+            color: #aaa;
+        }
+        .config-item input {
+            padding: 5px;
+            background: #444;
+            border: 1px solid #555;
+            color: #fff;
+            border-radius: 4px;
+        }
+        .config-item input[type="number"] {
+            width: 100px;
+        }
+        .config-item input[type="text"] {
+            width: 400px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+        .config-item input[type="url"] {
+            width: 300px;
+        }
+        .log {
+            background: #1a1a1a;
+            padding: 15px;
+            border-radius: 6px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            margin-top: 20px;
+        }
+        .log-entry {
+            margin-bottom: 5px;
+            color: #888;
+        }
+        .log-entry.error {
+            color: #ff4a4a;
+        }
+        .log-entry.success {
+            color: #4aff4a;
+        }
+    </style>
+    <script type="module">
+        import * as fl from 'https://cdn.jsdelivr.net/npm/@uwdata/flechette@2.2.3/+esm';
+
+        let audioContext;
+        let mediaStream;
+        let processor;
+        let isStreaming = false;
+        let packetsSent = 0;
+        let bytesTransferred = 0;
+        let startTime;
+        let sendInterval;
+
+        // Configuration
+        const config = {
+            sampleRate: 16000,  // GRCRN and Whisper optimal rate
+            chunkSize: 16384,   // Samples per chunk (1.024 seconds at 16kHz)
+            channels: 1,        // Mono audio
+            serverUrl: 'https://localhost:8443',
+            token: '',
+            sendIntervalMs: 500  // Send batched data every 500ms
+        };
+
+        // Audio buffer for batching
+        let audioBuffer = [];
+        let timestamps = [];
+
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function updateStatus(message, type = 'idle') {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+        }
+
+        function updateMetrics() {
+            if (!isStreaming) return;
+            
+            const elapsed = (Date.now() - startTime) / 1000;
+            document.getElementById('packets').textContent = packetsSent;
+            document.getElementById('dataRate').textContent = 
+                ((bytesTransferred / 1024) / elapsed).toFixed(2) + ' KB/s';
+            document.getElementById('duration').textContent = 
+                elapsed.toFixed(1) + 's';
+        }
+
+        async function sendBatchedAudio() {
+            if (audioBuffer.length === 0) return;
+
+            try {
+                // Use Flechette to create proper Arrow table
+                // Convert audio buffer to Float32Array
+                const audioSamples = new Float32Array(audioBuffer);
+
+                // Define explicit types to match server expectations
+                const types = {
+                    audio_chunk: fl.list(fl.field('l', fl.float32())),  // Variable-length list with named field
+                    timestamp_ms: fl.int64(),
+                    sample_rate: fl.int32()
+                };
+
+                // Create a table with Flechette using explicit types
+                const table = fl.tableFromArrays({
+                    audio_chunk: [[...audioSamples]],  // Nested array for List type
+                    timestamp_ms: [BigInt(Math.floor(timestamps[0] * 1000))],
+                    sample_rate: [config.sampleRate]
+                }, { types });
+
+                console.log('Sending audio batch with', audioSamples.length, 'samples');
+                console.log('Table schema:', table.schema);
+
+                // Convert to IPC stream format using Flechette
+                const ipcStream = fl.tableToIPC(table, { format: 'stream' });
+
+                // Send via fetch
+                const response = await fetch(`${config.serverUrl}/ingest/${config.token}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/vnd.apache.arrow.stream'
+                    },
+                    body: ipcStream
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    packetsSent++;
+                    bytesTransferred += ipcStream.byteLength;
+                    log(`Sent batch: ${result.rows} rows, ${ipcStream.byteLength} bytes`, 'success');
+                } else if (response.status === 429) {
+                    const retryAfter = response.headers.get('x-retry-after-ms') || '1000';
+                    log(`Rate limited, retry after ${retryAfter}ms`, 'error');
+                    setTimeout(() => sendBatchedAudio(), parseInt(retryAfter));
+                    return; // Don't clear buffer, retry later
+                } else {
+                    const error = await response.json();
+                    log(`Server error: ${error.error}`, 'error');
+                }
+
+                // Clear buffers after successful send
+                audioBuffer = [];
+                timestamps = [];
+
+            } catch (error) {
+                log(`Send error: ${error.message}`, 'error');
+                updateStatus(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function createAudioProcessor() {
+            await audioContext.audioWorklet.addModule(URL.createObjectURL(new Blob([`
+                class AudioProcessor extends AudioWorkletProcessor {
+                    constructor() {
+                        super();
+                        this.buffer = [];
+                        this.chunkSize = ${config.chunkSize};
+                    }
+
+                    process(inputs, outputs) {
+                        const input = inputs[0];
+                        if (input.length > 0) {
+                            const samples = input[0];
+                            this.buffer.push(...samples);
+                            
+                            while (this.buffer.length >= this.chunkSize) {
+                                const chunk = this.buffer.slice(0, this.chunkSize);
+                                this.buffer = this.buffer.slice(this.chunkSize);
+                                this.port.postMessage({
+                                    samples: new Float32Array(chunk),
+                                    timestamp: currentTime
+                                });
+                            }
+                        }
+                        return true;
+                    }
+                }
+                registerProcessor('audio-processor', AudioProcessor);
+            `], { type: 'application/javascript' })));
+
+            const source = audioContext.createMediaStreamSource(mediaStream);
+            processor = new AudioWorkletNode(audioContext, 'audio-processor');
+            
+            processor.port.onmessage = (event) => {
+                // Buffer audio data
+                audioBuffer.push(...event.data.samples);
+                timestamps.push(event.data.timestamp);
+            };
+
+            source.connect(processor);
+            processor.connect(audioContext.destination);
+        }
+
+        async function startStreaming() {
+            try {
+                // Validate configuration
+                config.token = document.getElementById('token').value.trim();
+                if (!config.token || config.token.length !== 64) {
+                    updateStatus('Invalid token: must be 64 hex characters', 'error');
+                    return;
+                }
+
+                config.serverUrl = document.getElementById('serverUrl').value.trim();
+                config.sampleRate = parseInt(document.getElementById('sampleRate').value);
+                config.chunkSize = parseInt(document.getElementById('chunkSize').value);
+
+                updateStatus('Requesting microphone access...', 'idle');
+                log('Starting audio capture...');
+                
+                // Get user media
+                mediaStream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        channelCount: config.channels,
+                        sampleRate: config.sampleRate,
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    }
+                });
+
+                // Create audio context with specific sample rate
+                audioContext = new AudioContext({ sampleRate: config.sampleRate });
+                
+                updateStatus('Streaming audio...', 'running');
+                isStreaming = true;
+                startTime = Date.now();
+                packetsSent = 0;
+                bytesTransferred = 0;
+                
+                await createAudioProcessor();
+                
+                // Start sending batched audio
+                sendInterval = setInterval(sendBatchedAudio, config.sendIntervalMs);
+                
+                // Start metrics update
+                setInterval(updateMetrics, 100);
+                
+                log('Audio streaming started', 'success');
+
+            } catch (error) {
+                updateStatus(`Error: ${error.message}`, 'error');
+                log(`Error: ${error.message}`, 'error');
+                console.error(error);
+                stopStreaming();
+            }
+        }
+
+        function stopStreaming() {
+            isStreaming = false;
+            
+            if (sendInterval) {
+                clearInterval(sendInterval);
+                sendInterval = null;
+            }
+            
+            if (processor) {
+                processor.disconnect();
+                processor = null;
+            }
+            
+            if (audioContext) {
+                audioContext.close();
+                audioContext = null;
+            }
+            
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop());
+                mediaStream = null;
+            }
+            
+            // Clear buffers
+            audioBuffer = [];
+            timestamps = [];
+            
+            updateStatus('Stopped', 'idle');
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            log('Audio streaming stopped');
+        }
+
+        // Event handlers
+        document.getElementById('startBtn').addEventListener('click', () => {
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+            startStreaming();
+        });
+
+        document.getElementById('stopBtn').addEventListener('click', stopStreaming);
+
+        // Initialize
+        updateStatus('Ready to start', 'idle');
+        document.getElementById('serverUrl').value = config.serverUrl;
+        document.getElementById('sampleRate').value = config.sampleRate;
+        document.getElementById('chunkSize').value = config.chunkSize;
+    </script>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 Audio Arrow Streamer</h1>
+        
+        <div class="config">
+            <div class="config-item">
+                <label>Token (64 hex):</label>
+                <input type="text" id="token" placeholder="64 character hex token" maxlength="64" pattern="[0-9a-fA-F]{64}">
+            </div>
+            <div class="config-item">
+                <label>Server URL:</label>
+                <input type="url" id="serverUrl" placeholder="https://localhost:8443">
+            </div>
+            <div class="config-item">
+                <label>Sample Rate (Hz):</label>
+                <input type="number" id="sampleRate" min="8000" max="48000" step="1000">
+            </div>
+            <div class="config-item">
+                <label>Chunk Size:</label>
+                <input type="number" id="chunkSize" min="1024" max="32768" step="1024">
+            </div>
+        </div>
+        
+        <div class="controls">
+            <button id="startBtn" class="start">Start Streaming</button>
+            <button id="stopBtn" class="stop" disabled>Stop Streaming</button>
+        </div>
+        
+        <div id="status" class="status idle">Ready to start</div>
+        
+        <div class="metrics">
+            <div class="metric">
+                <div class="metric-value" id="packets">0</div>
+                <div class="metric-label">Batches Sent</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value" id="dataRate">0 KB/s</div>
+                <div class="metric-label">Data Rate</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value" id="duration">0s</div>
+                <div class="metric-label">Duration</div>
+            </div>
+        </div>
+        
+        <div id="log" class="log"></div>
+    </div>
+</body>
+</html>
