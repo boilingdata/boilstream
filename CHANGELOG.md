@@ -5,6 +5,25 @@ All notable changes to BoilStream will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.15] - 2025-10-08
+
+### Features
+
+- DuckDB Secure Remote Secrets Storage REST API along with DuckDB Community Extension (https://github.com/dforsber/boilstream-extension)
+- GDPR compliant user management with nonrepudiation/nondisputability with PGP encrypted user email address (identity) when user is deleted. Only if public PGP key is configured.
+- Web tokens can be revoked like sessions. E.g. a revoked secrets scoped token used in the BoilStream DuckDB Extension does not have access to remote secrets storage anymore after revocation.
+
+### Fixes
+
+- Added verify password field to user manual sign up
+- Clearing Web Auth portal password fields on timeout and tab change
+- Added verify encryption key on initial boilstream ceremony
+- The superadmin ("boilstream") password now has similar strength requirements as the encryption key
+- If max sessions were reached, user was blocked. Now, the oldest session is revoked to allow user log in via API / WebAuth console (authentication must succeed).
+- TOTP code cannot be reused
+- Improved auth API input validations
+- Web tokens are generated per purpose/scope (e.g. "secrets", "ingest") to adhere with least privilege security principle
+
 ## [0.7.14] - 2025-09-22
 
 ### Features
