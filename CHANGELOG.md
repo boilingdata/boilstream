@@ -5,6 +5,18 @@ All notable changes to BoilStream will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.17] - 2025-10-14
+
+### Features
+
+- Re-designed the DuckDB Secure Remote Secrets Store protocol to be based on industry standard approaches (Facebook OPAQUE PAKE, OAuth2, HKDF, SHA256, etc.). See the DuckDB client extension and its [SECURITY_SPECIFICATION.md](https://github.com/dforsber/boilstream-extension/blob/main/SECURITY_SPECIFICATION.md) that also includes full conformance test suite with test vectors. We have independently developed both the server (Rust) and the DuckDB extension using the specification and its conformance test suites to make them fully interoperable. The Facebook's OPAQUE PAKE was audited by NCC back in 2021.
+- Secrets Storage comms are integrity protected inside the TLS channel and secrets are encrypted inside the TLS channel with AEAD (i.e. application level e2e protection). Mounting the Remote Secrets Storage happens with anonymised one-time bootstrap token (privacy).
+
+### Fixes
+
+- Shutdown is more swift now (e.g. for rolling restarts/updates)
+- Browser caching disabled with the Web Auth GUI
+
 ## [0.7.16] - 2025-10-09
 
 ### Features
