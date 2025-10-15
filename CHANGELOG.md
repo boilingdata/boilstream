@@ -5,6 +5,16 @@ All notable changes to BoilStream will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.18] - 2025-10-15
+
+### Features
+
+- Session resumption support for Remote Secrets Store API, matches DuckDB boilstream extension v0.3.1
+
+### Fixes
+
+- Complete separation of Web Auth GUI sessions from OPAQUE login sessions
+
 ## [0.7.17] - 2025-10-14
 
 ### Features
