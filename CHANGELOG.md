@@ -5,6 +5,19 @@ All notable changes to BoilStream will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.19] - 2025-10-29
+
+### Features
+
+- Audit logging to separate logs folder on disk with partitioning
+
+### Fixes
+
+- Fixed CORS for auth server to work with boilstream duckdb wasm extension from browser
+- Fixed session timestamp for opaque pake login response
+- Less bloated info logs
+- Server does not try to encrypt empty response body, but sends HTTP 204 instead
+
 ## [0.7.18] - 2025-10-15
 
 ### Features
