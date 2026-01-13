@@ -1,205 +1,127 @@
 # BoilStream - Stream to Gold Easily 🏆
 
-[BoilStream](https://wwww.boilstream.com/) is a small binary DuckDB server with steroids written in Rust (and a bit of C++).
+[BoilStream](https://www.boilstream.com/) is a multi-tenant DuckDB server written in Rust (and C++) with native DuckLake integration. Use for real-time streaming analytics, as a Data Warehouse and/or Data Lakehouse.
 
-Download, start, and connect with any BI Tool with Postgres interface for real-time analytics - ingest with Kafka clients and connect from [DuckDB clients with Airport extension](https://duckdb.org/community_extensions/extensions/airport.html) (and generally with FlightSQL) for high-throughput and scalable real-time data ingestion. It streams Parquet to storage backends like S3 with DuckLake in realtime as compact, hive partitioned Parquet files.
+Download, start, and connect with any Postgres-compatible BI tool. Ingest via Kafka, HTTPS Arrow, FlightRPC/FlightSQL. Data streams to S3 as DuckLake-managed Parquet files in realtime.
 
-BoilStream supports:
+**Key Features:**
 
-1. 🚀 **High-performance zero-copy\* data ingestion**: Kafka (avro with schema), HTTPS Arrow (e.g. with Flechette JS from tens of thousands of Browsers concurrently) FlightRPC ([DuckDB Airport community extension](https://duckdb.org/community_extensions/extensions/airport.html) from DuckDB clients), FlightSQL (e.g. ADBC driver, or ADBC FlightSQL JDBC bridge driver)
-2. 🚀 **1st Class Postgres compatible BI interface for real-time (streaming) Analytics** directly 1:1 mapped into DuckDB memory connections. Direct queries work with Power BI! See also [type compliance report](https://boilstream.com/test_report.html)
-3. 🚀 **Local on-disk DuckDB database layer** with high ingestion throughput
-4. 🚀 **Multiple "diskless" Parquet storage backends** like S3, GCP, Azuer, and Filesystem - when DuckDB client FlightRPC `INSERT` returns, **data is guaranteed to be on primary storage** (e.g. Minio or AWS S3). The data pipeline to S3 is completely diskless, so if you don't enable DuckDB local persistence layer, the disk is not used at all.
-5. 🚀 **Creating ingestion topics and materialised realtime views** (derived topics) with special `boilstream.s3` schema - use `CREATE TABLE` and `CREATE TABLE derived_view AS SELECT col1 FROM boilstream.s3.my_topic` for managing topics/views
-6. 🚀 **DuckLake integration:** S3 uploaded files are automatically added to DuckLake
-7. 🚀 **Our novel never-ending DuckDB SQL real-time streaming queries** for processing materialised views very efficiently (see CTAS over `boilstream.s3` schema below)
-8. 🚀 **Monitoring through prometheus compatible interface** along with an example Grafana Dashboard (see [`docker-compose.yml`](docker-compose.yml))
-9. 🚀 **Enterprise SSO with RBAC/ATAC as well as TLS and improved Postgres authentication** with [paid pro version](https://wwww.boilstream.com/)
+- **Multi-tenant DuckDB** with tenant isolation (secrets, attachments, DuckLakes, filesystem)
+- **High-performance ingestion**: Kafka (JIT Avro decoder 3-5x faster), HTTPS Arrow, FlightRPC/FlightSQL
+- **Postgres interface** for BI tools (Power BI, DBeaver, Metabase, Grafana). [Type compliance report](https://boilstream.com/test_report.html)
+- **DuckLake integration** with embedded PostgreSQL catalog, 1s hot tier commits, automatic backup/restore
+- **DuckLake vending** for native DuckDB clients, DuckDB-WASM browsers, and in-server queries
+- **Cold tier hydration API** (>1GB/s) to lift tables from cold to hot tier
+- **Streaming DuckLakes** with `__stream` suffix - tables become topics, views become materialised streams
+- **Enterprise SSO or local user accounts**: Entra ID SAML, SCIM user provisioning, MFA/PassKey
+- **Horizontal cluster mode** with S3-based leader election and distributed catalog management
+- **boilstream-admin CLI** for cluster management and observability
+- **DuckDB Remote Secrets Store** for secure credential storage via boilstream-extension
+- **Prometheus/Grafana monitoring** (metrics port 8081)
 
-This repository contains free download links and docker compose file for running the optional auxiliary services, like Grafana monitoring and Minio S3 for testing.
+**Companion extension**: [boilstream-extension v0.5.0](https://github.com/dforsber/boilstream-extension) for native DuckDB and DuckDB-WASM clients
 
-> \*) There is one data copy from kernel to userspace, which happens always unless you bypass kernel or use e.g. Linux XDP sockets to read raw data from the link directly. But then you also need to parse Ethernet and implement IP, TCP, TLS, gRPC, and Flight protocol stacks. Single port/core FlightRPC is already very efficient and reported to support +20GB/s data transfer speeds with single core. In BoilStream, data copying also happens when you convert the incoming Arrow format to Parquet files or to DuckDB on-disk database file - but that's all. The concurrent S3 Uploader and pre-allocated buffer pools ensure that the network copy reads from the Parquet writer output buffers directly. We even rotate the envelope vectors that carry the metadata along with the data references.
+## Web Auth GUI
 
-## No Backups Needed
+**Normal users** (port 443):
 
-No backups needed as it streams your data to S3 with automatic compacted and optimised Parquet conversion. Ingested data schema is validated so you don't get bad data in. The data on S3 is ready for analytics and is Hive Partitioned (DuckLake integration also available).
+- Vend temporary Postgres credentials and web tokens (ingest, secrets)
+- MFA management (TOTP, Passkeys, backup codes)
+- Session management and account settings
 
-Based on topic configuration, data is also persisted onto local disk as DuckDB database files. The realtime Analytics postgres connection reads directly from these DuckDB database files while the data is ingested into them.
+**Superadmin** (port 443/admin):
 
-BoilStream supports thousands of concurrent writers and GBs per second data ingestion rates (with single ingestion port), while using efficient stream aggregation from all the writers into per topic Parquet files. High throughput streaming creates S3 multipart upload files where Parquet row groups are uploaded concurrently (S3 multipart parts). The Parquet file is finalised when size/time threshold is reached.
+- Cloud accounts (AWS, Azure, GCP credential management)
+- S3 bucket registry and BoilStream roles (IAM-like access control)
+- DuckLake catalog management with ownership transfer
+- User management, role assignments to users/SAML groups
+- SAML SSO configuration (metadata upload, attribute mapping, SCIM)
+- Cluster management (brokers, leader stepdown)
+- Audit logging and cloud log forwarding (CloudWatch, Azure Monitor, GCP)
 
-> If you configure S3 as the primary storage and S3 is down, data ingestion stalls and the `INSERT` statements will hang until S3 becomes available again. Data integrity (security) is number one priority. FlightRPC data is also schema validated both on control plane (matching schema) as well as on data plane (actual data matches and validates with the schema).
+Also available via `boilstream-admin` CLI.
 
-> Secondary storage failures do not affect or stall data ingestion, like if you configure Filesystem as your primary and S3 as secondary.
+## Data Durability
 
-> Local DuckDB on-disk database persistence layer can be turned on/off and is independent of configured storage layers. You can also configure no Parquet storage layers and just ingest data onto DuckDB on-disk databases (or e.g. EBS volumes on cloud)
+Data streams to S3 with automatic Parquet conversion and schema validation. When `INSERT` returns, data is guaranteed on primary storage.
 
-> 2025-07-26: Currently, there is no DuckDB on-disk database file rotation or old data cleanup, but we will address this in the future release to avoid the common disk full scenario. For now, you can periodically delete old data.
+- **Primary storage failure**: Ingestion stalls until storage recovers (data integrity first)
+- **Secondary storage failure**: Does not affect ingestion
+- **Local DuckDB persistence**: Optional, independent of storage backends
 
-## Postgres interface
+## Interfaces
 
-**You can run any BI Tool over the postgres interface on the standard port 5432** (configurable). We have tested with Power BI, DBeaver, Metabase, Superset, Grafana, psql, pgbench.
+**Postgres (port 5432)**: Connect any BI tool - Power BI, DBeaver, Metabase, Superset, Grafana, psql. Also serves as DuckLake PostgreSQL catalog for native DuckDB clients (ducklake_* users).
 
-You can see our type compliance report online at [https://boilstream.com/test_report.html](https://boilstream.com/test_report.html)
+**FlightRPC (port 50051)**: High-performance Arrow ingestion from DuckDB clients via Airport extension.
 
-> DuckDB itself does not have "server mode" and does not implement client-server paradigm. With BoilStream you can run DuckDB efficiently as a server too.
+**FlightSQL (port 50250)**: Arrow-based SQL interface for ADBC drivers and FlightSQL clients.
 
-BoilStream supports:
+**HTTP/2 Arrow ingestion (port 443)**: Stream Arrow data from browsers (Flechette JS) or any HTTP client. Supports tens of thousands of concurrent connections.
 
-1. 🚀 Both text and binary encoded fields with extensive type support (time/date formats, JSON, uuid, List/Map/Struct, etc.)
-2. 🚀 Cursor and transaction management with DuckDB's native streaming queries
-3. 🚀 Comprehensive pg catalog for metadata discovery from BI Tools with postgres SQL syntax
+**Kafka**: Confluent Schema Registry with Avro format. Uses same topics as FlightRPC/FlightSQL.
 
-## Kafka interface
-
-BoilStream has Confluent Schema with Avro data format Kafka interface support. Stream in data with Kafka by using the same topics/tables as with FlightRPC/FlightSQL. The same schema table has both arrow and avro schemas.
-
-## Real-time SQL Streaming - never-ending SQL queries!
-
-We use our _innovative never ending continuous stream processing with DuckDB_ 🚀 . This avoids SQL parsing, Arrow Table registration, cleanup and other hassle present (micro) batch processing approaches.
-
-As the data flows in as Arrow data it goes through DuckDB stream processors that produce data for the derived views. These derived topic processors are initialised once with the specified SQL, but run as long as the data flows (unless you create SQL that finishes on purpose like with LIMIT). These streaming processors only work with DuckDB's physical streaming constructs (e.g. LAG etc.).
-
-> **For all proper window queries, we are adding support through the on-disk cached DuckDB databases. This way we can provide even hourly "batching" automatically.** But for now, you can already run queries over the Postgres interface if you like.
+**Real-time SQL Streaming**: Views in `__stream` DuckLakes become never-ending continuous stream processors without micro-batch overhead.
 
 ## Start
 
 ```bash
-# Download and start boilstream - if no configuration file is provided, it will generate an example one
-# https://www.boilstream.com/binaries/linux-aarch64/boilstream-0.7.18
-# https://www.boilstream.com/binaries/linux-x64/boilstream-0.7.18
-# https://www.boilstream.com/binaries/darwin-x64/boilstream-0.7.18
-curl -L -o boilstream https://www.boilstream.com/binaries/darwin-aarch64/boilstream-0.7.18
-chmod +x boilstream
+# Download boilstream (generates example config if none provided)
+# Linux: linux-x64, linux-aarch64 | macOS: darwin-x64, darwin-aarch64
+curl -L -o boilstream https://www.boilstream.com/binaries/darwin-aarch64/boilstream-0.8.0
+curl -L -o boilstream-admin https://www.boilstream.com/binaries/darwin-aarch64/boilstream-admin-0.8.0
+chmod +x boilstream boilstream-admin
 
 # SERVER_IP_ADDRESS is used on the Flight interface, use reachable IP address
 SERVER_IP_ADDRESS=1.2.3.4 ./boilstream
 
-# You can also use Docker images:
-# boilinginsights/boilstream:x64-linux-0.7.18 or boilinginsights/boilstream:aarch64-linux-0.7.18
+# Docker: boilinginsights/boilstream:x64-linux-0.8.0 or :aarch64-linux-0.8.0
 docker run -v ./config.yaml:/app/config.yaml \
-   -p 5432:5432 \
-   -p 50250:50250 \
-   -p 50051:50051 \
-   -e SERVER_IP_ADDRESS=1.2.3.4 boilinginsights/boilstream:aarch64-linux-0.7.18
+   -p 443:443 -p 5432:5432 -p 50051:50051 -p 50250:50250 \
+   -e SERVER_IP_ADDRESS=1.2.3.4 boilinginsights/boilstream:aarch64-linux-0.8.0
 ```
 
 > _You can use the accompanying docker-compose.yml file to start auxiliary containers for Grafana Dashboard and S3 Minio_
 
-Connect through the postgres interface with your tool of choice, like [DBeaver](https://dbeaver.io/download/) that we have been extensively using.
+## Streaming DuckLakes
 
-- See the [workbook.sql](workbook.sql) for full example
-- See the [demo_database.sql](demo_database.sql) for extensive type testing example, which we used with Power BI testing
-
-**The `boilstream.s3.` schema is specific for real-time streaming. Tables created to it become available on the FlightRPC side for ingestion. CTAS tables become materialised views (not writable from FlightRPC ingestion side)**
+Create a DuckLake with `__stream` suffix for real-time streaming. Tables become ingestion topics, views become materialised streaming views.
 
 ```sql
--- Create topic
-CREATE TABLE boilstream.s3.people (name VARCHAR, age INT, tags VARCHAR[]);
--- Derived topics aka **materialised real-time views**
--- With their own S3 Parquet data as well as on-disk DuckDB database views like the main topic
-CREATE TABLE boilstream.s3.filtered_adults AS SELECT * FROM boilstream.s3.people WHERE age > 50;
-CREATE TABLE boilstream.s3.filtered_b AS SELECT * FROM boilstream.s3.people WHERE name LIKE 'b%';
-CREATE TABLE boilstream.s3.filtered_a AS SELECT * FROM boilstream.s3.people WHERE name LIKE 'a%';
+-- Create streaming DuckLake (via Web GUI or boilstream-admin CLI)
+-- Tables in __stream DuckLakes automatically become ingestion topics
+CREATE TABLE my_data__stream.main.people (name VARCHAR, age INT, tags VARCHAR[]);
+
+-- Views become materialised real-time streaming views
+CREATE VIEW my_data__stream.main.adults AS SELECT * FROM people WHERE age > 50;
 ```
 
-Check existing topics and their metadata:
+### Ingesting with DuckDB clients
 
-```sql
--- topic metadata
-select * from boilstream.topics;
-select * from boilstream.topic_schemas;
-select * from boilstream.derived_views;
-```
-
-`ATTACH` BoilStream topics write end point to itself.
-
-> BoilStream can attach itself (has actually in-built Airport extension), but also other BoilStream servers or other Airport servers (FlightRPC `do_exchange` method)
-
-```sql
-LOAD '/tmp/airport.duckdb_extension';
-SELECT extension_name, loaded from duckdb_extensions() where loaded=true;
-ATTACH 'boilstream' AS data (TYPE AIRPORT, location 'grpc://localhost:50051/');
-SHOW ALL TABLES;
--- Write into "people" topic
-INSERT INTO data.s3.people
-   SELECT
-      'boilstream_' || i::VARCHAR AS name,
-      (i % 100) + 1 AS age,
-      ['duckdb', 'ducklake'] AS tags
-   FROM generate_series(1, 20000) as t(i);
-
-```
-
-### With remote DuckDB clients
-
-Start ingesting data with DuckDB clients. **When DuckDB statement returns, data is guaranteed to be on S3!**
+**When INSERT returns, data is guaranteed on S3.**
 
 ```sql
 INSTALL airport FROM community;
 LOAD airport;
-ATTACH 'boilstream' (TYPE AIRPORT, location 'grpc://localhost:50051/');
--- With pro-version, use TLS: 'grpc+tls://localhost:50051/'
+ATTACH 'my_data__stream' (TYPE AIRPORT, location 'grpc://localhost:50051/');
 
-SHOW ALL TABLES;
-
-INSERT INTO boilstream.s3.people
-   SELECT
-      'boilstream_' || i::VARCHAR AS name,
-      (i % 100) + 1 AS age,
-      ['duckdb', 'ducklake'] AS tags
+INSERT INTO my_data__stream.main.people
+   SELECT 'user_' || i::VARCHAR AS name, (i % 100) + 1 AS age, ['duckdb'] AS tags
    FROM generate_series(1, 20000) as t(i);
 ```
 
-> The BoilStream configuration file `storage.backends.flush_interval_ms` (with backend type "s3") configuration option defines the S3 synchronization interval, which also completes the DuckDB INSERT transactions you run with the Airport extension from all the clients. The smaller the flush interval, the faster response times you get, but smaller fragmented Parquet files. You can send millions of rows or just one row and the query completes in these intervals as the storage backend signals all verifiably (S3) stored sequence numbers onto Parquet back to the data ingestion frontend which ensures that all data is successfully stored on S3 before returning success back to Airport clients.
-
-**Monitor your data with Grafana**: http://localhost:3000 (admin/admin)
+**Monitor with Grafana**: http://localhost:3000 (admin/admin)
 
 ## 📋 Requirements
 
-- Docker and Docker Compose
 - 8GB+ RAM recommended
-- OSX or Linux (Ubuntu 24+)
-- arm64 (we can build for OS/Arch on request)
-
-## 🎯 Free Tier Limits
-
-> NOTE: BoilStream can ingest GBs per second, so you may hit the free tier limit quickly. Thus, use the rate limiter configuration on the configuration file.
-
-- **Data ingestion**: 40 GB per hour (you need to restart if you hit the limit)
-- **Max concurrent sessions**: Limited to 10
-- **No authentication**: No authentication or access control
-- **No TLS**: Runs on plain FlightRPC connection without TLS
+- macOS (x64, arm64) or Linux (x64, arm64)
+- Docker optional (for Grafana, Minio)
 
 ## 📋 Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for version history and release notes.
 
-## 🏗️ Architecture
+## Documentation
 
-For complete documentation, visit: **[www.boilstream.com](https://www.boilstream.com)** and **[docs.boilstream.com](https://docs.boilstream.com)**
-
-BoilStream processes your data through:
-
-1. **Flight RPC** - High-performance data ingestion with Apache Arrow and zero-copy implementation
-2. **S3** - Automated Parquet storage with Hive partitioning
-3. **Rate limiting** - Rate limiting support
-4. **BI Tool Integration** - Postgres compatible interface for BI Tool and other integrations
-5. **DuckLake** - Integration with [DuckLake](https://duckdb.org/2025/05/27/ducklake.html)
-
-Auxiliary services:
-
-6. **Prometheus** - Metrics collection
-7. **Grafana** - Real-time monitoring dashboards
-
-## 🆙 Upgrading to Paid version
-
-- **Security**: FlightRPC with TLS, authentication and access control
-- **Uncapped**: No throughput limits, max concurrent sessions with single node 10k (configurable)
-
-## 🆙 Upgrading to Enterprise version
-
-- **Multi-node**: Horizontal scaling by just adding more nodes
-- **Federated Authentication**: Integration with authentication providers
-
-Need higher limits or advanced features? Contact us at **[boilstream.com](https://www.boilstream.com)**
+Full docs: **[docs.boilstream.com](https://docs.boilstream.com)** | Contact: **[boilstream.com](https://www.boilstream.com)**

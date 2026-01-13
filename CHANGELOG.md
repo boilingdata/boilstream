@@ -5,6 +5,51 @@ All notable changes to BoilStream will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-01-13
+
+### Features
+
+- **Multi-tenant DuckDB**: Boilstream runs single DuckDB instance with tenant isolation security
+  - Secrets, ATTACHments, DuckLakes, filesystem (chroot like), etc. separation between tenants
+  - Tenants don't see each other, but share the same resources
+  - Preliminary metrics collection for fair scheduling/billing in the future when needed
+- **JIT Avro Decoder for Kafka Ingestion**: New state-of-the-art just-in-time (JIT) compiled Avro decoder
+  - Achieving 3-5x faster performance compared to the Rust Apache Arrow decoder released Oct 2025
+  - Bounds checking in/out to protect against corrupted/malicious data
+  - All Avro types included and thoroughly tested, including complex/nested types, roundtrip and perf tests
+- **Embedded DuckLake PostgreSQL Catalog**: Native pg_catalog support for DuckLake databases
+  - Automatic catalog backup/restore to S3 based on user login/logout and changes
+  - Seamless schema discovery with tools like DBeaver (ensure multidatabase support setting is on)
+- **DuckLake Data Inlining Support for Stream Ingested Data**: Transactional batch commits to hot tier every 1s
+  - Automatic hot and cold tier DuckLake snapshots
+  - Realtime cpp appender data committed once per second, immediately visible for ducklake users
+- **DuckLake Vending Support**: Unified data access across multiple client types.
+  - In-server queries with multi-tenant DuckDB attached DuckLake databases
+  - Remote native DuckDB clients with full PostgreSQL DuckLake catalog support, including the hot inline data
+  - DuckDB-WASM browser clients with cached/synced (1min) DuckDB catalogs on S3 (DuckDB-WASM lacks postgres scanner)
+  - Each client automatically vends correct temporary credentials per client type for each user
+- **Cold Tier Hydration API**: Lift DuckLake tables from cold tier to hot tier
+  - DuckDB cpp level appender with >1GB/s hydration speed, prioritised with ingestion streams
+- **Entra ID SAML SSO and SCIM**: Enterprise SSO integration with XML metadata file download/upload
+  - Download/upload XML files for easy setup
+  - SCIM User Synchronization for automatic user provisioning and deprovisioning via SCIM protocol
+  - If you enable SAML SSO, local users are disabled (except superadmin)
+- **Preliminary Horizontal Cluster Mode**: Horizontal scaling support for distributed deployments
+  - Cluster leader for user management and metadata with S3 locking and heartbeats
+  - Users' DuckLake PG catalog leaders distributed over the cluster with on-demand backup/restore (login/logout/dirty)
+  - Control with boilstream-admin CLI tool
+- **boilstream-admin CLI**: New command-line tool for managing and observing BoilStream clusters (uses admin API)
+  - Hydrating ducklake tables, demote/promote leader nodes
+  - Let AI manage and observe your boilstream clusters
+  - download as boilstream-admin-x.y.z matching with boilstream-x.y.z version, arch, and OS
+- **matching boilstream extension version: 0.5.0**
+  - Use with native DuckDB clients as well as with DuckDB-WASM
+  - More details at https://github.com/dforsber/boilstream-extension
+
+### Fixes
+
+- Correct multi-database visibility over our 1st class Postgres interface, showing "memory" database and any attached databases as their own (like Ducklakes). DBeaver supports "multiple databases" and shows each database as a seprate Database on the navigator
+
 ## [0.7.19] - 2025-10-29
 
 ### Features
