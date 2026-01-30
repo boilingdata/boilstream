@@ -5,6 +5,48 @@ All notable changes to BoilStream will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.1] - 2026-01-26
+
+- **boilstream-admin CLI Improvements**: Enhanced CLI for scripting and AI agent integration
+  - `--json` flag: Shorthand for `--output json`
+  - `help-json` command: Machine-readable command structure for tooling/skill discovery
+  - `completions` command: Shell completions for bash, zsh, fish, powershell, elvish
+  - `BOILSTREAM_PROFILE` env var: Set default profile without `--profile` flag
+  - `--dry-run` flag: Preview destructive operations before execution (catalog/user/token delete, s3-state clear)
+  - Semantic exit codes: 0=success, 2=auth, 3=not found, 4=permission denied, 5=validation, 6=network
+  - Structured JSON error output: Error responses include `code`, `details`, and `exit_code` fields
+
+- **Confluent Schema Registry (Read-Only Compatible)**: Production-ready schema registry for Kafka clients
+  - Full read API compliance: `/subjects`, `/schemas/ids/{id}`, `/config`, `/compatibility`
+  - Confluent wire format: magic byte `0x00` + 4-byte global ID + Avro payload
+  - All 7 compatibility levels supported (BACKWARD, FORWARD, FULL + TRANSITIVE variants)
+  - Bearer token authentication with tenant isolation
+  - Schemas auto-registered via DuckLake DDL (`CREATE TABLE` → schema, `ALTER TABLE` → new version)
+  - Subject naming: `{catalog_id}.{schema}.{table}-value` (TopicNameStrategy)
+
+- **Kafka Consumer Group Improvements**
+  - Fixed `seekToBeginning` support for re-reading from offset 0
+  - Member validation on OFFSET_COMMIT (Kafka protocol compliance)
+  - Consumer group offset state persisted in metadata database
+
+### Fixes
+
+- **Linux stability on high-CPU machines**: Fixed glibc malloc arena fragmentation causing "memory allocation failed" crashes on machines with 28+ vCPUs. Root cause: glibc creates up to `8 × num_cpus` arenas, fragmenting virtual address space so large allocations fail despite available physical memory. Fix: `mallopt(M_ARENA_MAX, 4)` at startup.
+- **DuckDB FFI data race**: Fixed `global_call_count` race condition in C++ FFI layer using `std::atomic`
+
+### Improvements
+
+- **DuckDB v1.4.4 LTS**: Rebased embedded DuckDB fork to v1.4.4 LTS
+- **C++ API only**: Migrated all DuckDB FFI from mixed C/C++ API to C++ API only
+- **FFI safety test suites**: Added ASAN (memory safety) and TSAN (thread safety) test suites for the C++ FFI boundary with Makefile build targets
+- **Test reorganization**: Restructured test files under `tests/` directory
+- **Safety checks**: Architecture-aware sanitizer builds supporting both x86_64 and aarch64
+
+### Documentation
+
+- Schema Registry API documentation
+- Kafka interface consumer group semantics
+
 ## [0.8.0] - 2026-01-13
 
 ### Features

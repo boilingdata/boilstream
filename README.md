@@ -51,7 +51,7 @@ Data streams to S3 with automatic Parquet conversion and schema validation. When
 
 ## Interfaces
 
-**Postgres (port 5432)**: Connect any BI tool - Power BI, DBeaver, Metabase, Superset, Grafana, psql. Also serves as DuckLake PostgreSQL catalog for native DuckDB clients (ducklake_* users).
+**Postgres (port 5432)**: Connect any BI tool - Power BI, DBeaver, Metabase, Superset, Grafana, psql. Also serves as DuckLake PostgreSQL catalog for native DuckDB clients (ducklake\_\* users).
 
 **FlightRPC (port 50051)**: High-performance Arrow ingestion from DuckDB clients via Airport extension.
 
@@ -59,7 +59,7 @@ Data streams to S3 with automatic Parquet conversion and schema validation. When
 
 **HTTP/2 Arrow ingestion (port 443)**: Stream Arrow data from browsers (Flechette JS) or any HTTP client. Supports tens of thousands of concurrent connections.
 
-**Kafka**: Confluent Schema Registry with Avro format. Uses same topics as FlightRPC/FlightSQL.
+**Kafka (port 9092)**: Confluent Schema Registry compatible with Avro format. Built-in read-only schema registry at `/schema-registry` for schema discovery.
 
 **Real-time SQL Streaming**: Views in `__stream` DuckLakes become never-ending continuous stream processors without micro-batch overhead.
 
@@ -68,17 +68,17 @@ Data streams to S3 with automatic Parquet conversion and schema validation. When
 ```bash
 # Download boilstream (generates example config if none provided)
 # Linux: linux-x64, linux-aarch64 | macOS: darwin-x64, darwin-aarch64
-curl -L -o boilstream https://www.boilstream.com/binaries/darwin-aarch64/boilstream-0.8.0
-curl -L -o boilstream-admin https://www.boilstream.com/binaries/darwin-aarch64/boilstream-admin-0.8.0
+curl -L -o boilstream https://www.boilstream.com/binaries/darwin-aarch64/boilstream-0.8.1
+curl -L -o boilstream-admin https://www.boilstream.com/binaries/darwin-aarch64/boilstream-admin-0.8.1
 chmod +x boilstream boilstream-admin
 
 # SERVER_IP_ADDRESS is used on the Flight interface, use reachable IP address
 SERVER_IP_ADDRESS=1.2.3.4 ./boilstream
 
-# Docker: boilinginsights/boilstream:x64-linux-0.8.0 or :aarch64-linux-0.8.0
+# Docker: boilinginsights/boilstream:x64-linux-0.8.1 or :aarch64-linux-0.8.1
 docker run -v ./config.yaml:/app/config.yaml \
    -p 443:443 -p 5432:5432 -p 50051:50051 -p 50250:50250 \
-   -e SERVER_IP_ADDRESS=1.2.3.4 boilinginsights/boilstream:aarch64-linux-0.8.0
+   -e SERVER_IP_ADDRESS=1.2.3.4 boilinginsights/boilstream:aarch64-linux-0.8.1
 ```
 
 > _You can use the accompanying docker-compose.yml file to start auxiliary containers for Grafana Dashboard and S3 Minio_
