@@ -5,7 +5,17 @@ All notable changes to BoilStream will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.8.1] - 2026-01-26
+## [0.8.2] - 2026-01-30
+
+### Fixes
+
+- **S3 connectivity on non-EC2 environments**: Fixed S3 storage backend failing to connect on Hetzner, bare-metal, and other non-AWS environments
+  - Explicitly enable virtual-hosted-style URLs for AWS S3 (required for buckets created after Sep 2020)
+  - Removed forced HTTP/2-only mode that caused connection failures in some network environments
+  - Added retry error logging to surface actual S3 errors instead of silent infinite retries
+  - Added credential source logging (`explicit` vs `from-environment/IMDS`) for easier debugging
+
+## [0.8.1] - 2026-01-30
 
 - **boilstream-admin CLI Improvements**: Enhanced CLI for scripting and AI agent integration
   - `--json` flag: Shorthand for `--output json`
