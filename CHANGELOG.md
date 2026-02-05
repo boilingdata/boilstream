@@ -5,6 +5,13 @@ All notable changes to BoilStream will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.3] - 2026-02-05
+
+### Fixes
+
+- **Boolean array encoding**: Fixed boolean arrays returning corrupted values over the PostgreSQL wire protocol. The Arrow Int8-based boolean array encoder incorrectly treated scalar byte values as bit-packed data, causing all values after the first `false` to become `false`. Affects `SELECT $1::BOOLEAN[]` roundtrips and any query returning boolean arrays via DuckDB's `arrow_lossless_conversion`.
+- **Streaming INSERT classifier**: Fixed fully-qualified 3-part table names with `__stream` suffix (e.g. `catalog__stream.schema.table`) not being detected as streaming INSERTs when no session context was provided.
+
 ## [0.8.2] - 2026-01-30
 
 ### Fixes
