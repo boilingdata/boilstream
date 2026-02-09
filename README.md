@@ -67,7 +67,7 @@ Data streams to S3 with automatic Parquet conversion and schema validation. When
 
 ```bash
 # Download boilstream (generates example config if none provided)
-# Linux: linux-x64, linux-aarch64 | macOS: darwin-x64, darwin-aarch64
+# Linux: linux-x64, linux-aarch64 | macOS: darwin-aarch64
 curl -L -o boilstream https://www.boilstream.com/binaries/darwin-aarch64/boilstream-0.8.3
 curl -L -o boilstream-admin https://www.boilstream.com/binaries/darwin-aarch64/boilstream-admin-0.8.3
 chmod +x boilstream boilstream-admin
@@ -115,7 +115,7 @@ INSERT INTO my_data__stream.main.people
 ## 📋 Requirements
 
 - 8GB+ RAM recommended
-- macOS (x64, arm64) or Linux (x64, arm64)
+- macOS (arm64) or Linux (x64, arm64)
 - Docker optional (for Grafana, Minio)
 
 ## 📋 Changelog
