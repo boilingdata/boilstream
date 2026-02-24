@@ -5,6 +5,40 @@ All notable changes to BoilStream will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.4] - 2026-02-24
+
+### Features
+
+- **SSE Consumer Endpoint**: Real-time streaming consumer via Server-Sent Events (SSE)
+  - `GET /stream/{token}` endpoint for browser and HTTP clients
+  - Arrow IPC base64 encoding for efficient binary transport
+  - Heartbeat and schema change events
+  - PULL mode catchup via `Last-Event-ID` header for resumable streams
+  - Per-user/topic rate limiting and connection limits
+  - Shared token validation with configurable expiry
+  - JS consumer SDK for browser integration
+
+- **FlightSQL Multi-Tenant Bootstrap**: Full tenant isolation parity with pgwire
+  - Per-user session bootstrap with DuckLake catalog attachment
+  - Tenant-isolated metadata queries and prepared statements
+
+- **DuckLake Parquet Statistics**: Extract real min/max column statistics from Parquet files for DuckLake catalog registration, improving query planning and pruning
+
+### Fixes
+
+- **Tenant isolation**: Fixed DDL handler using shared processor instead of bootstrapped connection, ensuring proper tenant separation
+- **Postgres stability**: Fixed pgwire ATTACH failures and CDC retry reliability
+- **Connection cache**: Fixed TTL expiry, added per-query RBAC enforcement and VIEW metadata support
+- **PK/FK metadata APIs**: Return empty results instead of unimplemented error for better client compatibility
+- **Kafka consumer**: Fixed ListOffsets fallback, HotChunkManager initialization, and stderr pipe handling
+- **DuckLake column stats**: Fixed stats registration and Kafka server TOCTOU race condition
+
+### Improvements
+
+- **HotChunkManager startup reconstruction**: Automatic recovery of in-flight data on restart with slow consumer PULL fallback
+- **Shared database utilities**: Extracted `shared_db_utils` module for hot chunk database queries
+- **SSE view cache**: Cached view metadata for streaming DuckLake queries
+
 ## [0.8.3] - 2026-02-05
 
 ### Fixes
