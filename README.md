@@ -1,78 +1,45 @@
-# BoilStream - Stream to Gold Easily 🏆
+# BoilStream — Streaming Ingestion Lakehouse
 
-[BoilStream](https://www.boilstream.com/) is a multi-tenant DuckDB server written in Rust (and C++) with native DuckLake integration. Use for real-time streaming analytics, as a Data Warehouse and/or Data Lakehouse.
+[BoilStream](https://www.boilstream.com/) is a multi-tenant DuckDB server written in Rust with native DuckLake integration. Ingest, transform, aggregate, search, and consume streaming data — all with SQL.
 
-Download, start, and connect with any Postgres-compatible BI tool. Ingest via Kafka, HTTPS Arrow, FlightRPC/FlightSQL. Data streams to S3 as DuckLake-managed Parquet files in realtime.
+Download, start, and connect with any Postgres-compatible BI tool. Data streams to S3 as DuckLake-managed Parquet files in real-time.
 
-**Key Features:**
+## Key Features
 
-- **Multi-tenant DuckDB** with tenant isolation (secrets, attachments, DuckLakes, filesystem)
-- **High-performance ingestion**: Kafka (JIT Avro decoder 3-5x faster), HTTPS Arrow, FlightRPC/FlightSQL
-- **Postgres interface** for BI tools (Power BI, DBeaver, Metabase, Grafana). [Type compliance report](https://boilstream.com/test_report.html)
-- **DuckLake integration** with embedded PostgreSQL catalog, 1s hot tier commits, automatic backup/restore
-- **DuckLake vending** for native DuckDB clients, DuckDB-WASM browsers, and in-server queries
-- **Cold tier hydration API** (>1GB/s) to lift tables from cold to hot tier
-- **Streaming DuckLakes** with `__stream` suffix - tables become topics, views become materialised streams
-- **Enterprise SSO or local user accounts**: Entra ID SAML, SCIM user provisioning, MFA/PassKey
-- **Horizontal cluster mode** with S3-based leader election and distributed catalog management
-- **boilstream-admin CLI** for cluster management and observability
-- **DuckDB Remote Secrets Store** for secure credential storage via boilstream-extension
-- **Prometheus/Grafana monitoring** (metrics port 8081)
+**Streaming Data Flow** — Ingest → Transform → Aggregate → Search → Consume
 
-**Companion extension**: [boilstream-extension v0.5.0](https://github.com/dforsber/boilstream-extension) for native DuckDB and DuckDB-WASM clients
+- **Multi-tenant DuckDB** — Full tenant isolation (secrets, attachments, DuckLakes, filesystem)
+- **Streaming views** — Continuous row-by-row SQL transforms on ingested data
+- **Materialized views** — Tumbling/sliding window aggregations with DuckDB SQL
+- **Full-text search** — Integrated [Tantivy](https://github.com/quickwit-oss/tantivy) indexing with hot/cold tiered storage and `multilake_search()` SQL function
+- **Real-time consumption** — SSE push with Arrow IPC batches via [`@boilstream/consumer`](https://github.com/dforsber/boilstream-consumer-js) JS SDK
+- **DuckLake integration** — Embedded PostgreSQL catalog, 1s hot tier commits, cold tier hydration (>1GB/s)
+- **DuckLake vending** — Credential vending for native DuckDB, DuckDB-WASM, and in-server queries
+- **Enterprise auth** — Entra ID SAML, SCIM provisioning, MFA/Passkeys, Web Auth GUI
+- **Cluster mode** — S3-based leader election, distributed catalog management
+- **Multi-cloud** — AWS S3, Azure Blob, GCS, MinIO, filesystem
 
-## Web Auth GUI
-
-**Normal users** (port 443):
-
-- Vend temporary Postgres credentials and web tokens (ingest, secrets)
-- MFA management (TOTP, Passkeys, backup codes)
-- Session management and account settings
-
-**Superadmin** (port 443/admin):
-
-- Cloud accounts (AWS, Azure, GCP credential management)
-- S3 bucket registry and BoilStream roles (IAM-like access control)
-- DuckLake catalog management with ownership transfer
-- User management, role assignments to users/SAML groups
-- SAML SSO configuration (metadata upload, attribute mapping, SCIM)
-- Cluster management (brokers, leader stepdown)
-- Audit logging and cloud log forwarding (CloudWatch, Azure Monitor, GCP)
-
-Also available via `boilstream-admin` CLI.
-
-## Data Durability
-
-Data streams to S3 with automatic Parquet conversion and schema validation. When `INSERT` returns, data is guaranteed on primary storage.
-
-- **Primary storage failure**: Ingestion stalls until storage recovers (data integrity first)
-- **Secondary storage failure**: Does not affect ingestion
-- **Local DuckDB persistence**: Optional, independent of storage backends
+**Companion projects:** [boilstream-extension](https://github.com/dforsber/boilstream-extension) for DuckDB/WASM clients | [`@boilstream/consumer`](https://github.com/dforsber/boilstream-consumer-js) for SSE consumption
 
 ## Interfaces
 
-**Postgres (port 5432)**: Connect any BI tool - Power BI, DBeaver, Metabase, Superset, Grafana, psql. Also serves as DuckLake PostgreSQL catalog for native DuckDB clients (ducklake\_\* users).
-
-**FlightRPC (port 50051)**: High-performance Arrow ingestion from DuckDB clients via Airport extension.
-
-**FlightSQL (port 50250)**: Arrow-based SQL interface for ADBC drivers and FlightSQL clients.
-
-**HTTP/2 Arrow ingestion (port 443)**: Stream Arrow data from browsers (Flechette JS) or any HTTP client. Supports tens of thousands of concurrent connections.
-
-**Kafka (port 9092)**: Confluent Schema Registry compatible with Avro format. Built-in read-only schema registry at `/schema-registry` for schema discovery.
-
-**Real-time SQL Streaming**: Views in `__stream` DuckLakes become never-ending continuous stream processors without micro-batch overhead.
+| Interface | Port | Description |
+|-----------|------|-------------|
+| **Postgres** | 5432 | BI tools (Power BI, DBeaver, Grafana, psql). [Type compliance report](https://boilstream.com/test_report.html) |
+| **FlightRPC** | 50051 | High-performance Arrow ingestion via Airport extension |
+| **FlightSQL** | 50250 | Arrow SQL for ADBC drivers and FlightSQL clients |
+| **HTTP/2 Arrow** | 443 | Arrow POST from browsers or HTTP clients |
+| **Kafka** | 9092 | Kafka wire protocol with Schema Registry and Confluent binary Avro |
+| **SSE** | 443 | Real-time Arrow IPC push to browsers and services |
 
 ## Start
 
 ```bash
-# Download boilstream (generates example config if none provided)
-# Linux: linux-x64, linux-aarch64 | macOS: darwin-aarch64
+# Download (linux-x64, linux-aarch64, darwin-aarch64)
 curl -L -o boilstream https://www.boilstream.com/binaries/darwin-aarch64/boilstream-0.8.4
 curl -L -o boilstream-admin https://www.boilstream.com/binaries/darwin-aarch64/boilstream-admin-0.8.4
 chmod +x boilstream boilstream-admin
 
-# SERVER_IP_ADDRESS is used on the Flight interface, use reachable IP address
 SERVER_IP_ADDRESS=1.2.3.4 ./boilstream
 
 # Docker: boilinginsights/boilstream:x64-linux-0.8.4 or :aarch64-linux-0.8.4
@@ -81,22 +48,29 @@ docker run -v ./config.yaml:/app/config.yaml \
    -e SERVER_IP_ADDRESS=1.2.3.4 boilinginsights/boilstream:aarch64-linux-0.8.4
 ```
 
-> _You can use the accompanying docker-compose.yml file to start auxiliary containers for Grafana Dashboard and S3 Minio_
+> _Use the accompanying `docker-compose.yml` to start Grafana and MinIO_
 
 ## Streaming DuckLakes
 
-Create a DuckLake with `__stream` suffix for real-time streaming. Tables become ingestion topics, views become materialised streaming views.
+DuckLakes with `__stream` suffix enable real-time streaming. Tables become ingestion topics.
 
 ```sql
--- Create streaming DuckLake (via Web GUI or boilstream-admin CLI)
--- Tables in __stream DuckLakes automatically become ingestion topics
-CREATE TABLE my_data__stream.main.people (name VARCHAR, age INT, tags VARCHAR[]);
+CREATE TABLE my_data__stream.main.events (user_id VARCHAR, event_type VARCHAR, ts TIMESTAMP, payload JSON);
 
--- Views become materialised real-time streaming views
-CREATE VIEW my_data__stream.main.adults AS SELECT * FROM people WHERE age > 50;
+-- Streaming view: continuous row-by-row filter
+CREATE STREAMING VIEW clicks AS SELECT * FROM events WHERE event_type = 'click';
+
+-- Materialized view: windowed aggregation
+CREATE MATERIALIZED VIEW events_per_min AS
+  SELECT event_type, COUNT(*) AS cnt FROM events
+  WITH (window_type='tumbling', window_size='1 minute', timestamp_column='ts');
+
+-- Full-text search: enable indexing, then query
+ALTER TABLE my_data__stream.main.events SET (tantivy_enabled = true, tantivy_text_fields = 'payload');
+SELECT * FROM multilake_search('my_data__stream', 'events__tantivy_idx', 'error timeout');
 ```
 
-### Ingesting with DuckDB clients
+### Ingest with DuckDB
 
 **When INSERT returns, data is guaranteed on S3.**
 
@@ -105,20 +79,19 @@ INSTALL airport FROM community;
 LOAD airport;
 ATTACH 'my_data__stream' (TYPE AIRPORT, location 'grpc://localhost:50051/');
 
-INSERT INTO my_data__stream.main.people
-   SELECT 'user_' || i::VARCHAR AS name, (i % 100) + 1 AS age, ['duckdb'] AS tags
-   FROM generate_series(1, 20000) as t(i);
+INSERT INTO my_data__stream.main.events
+   SELECT 'user_' || i::VARCHAR, CASE WHEN i % 3 = 0 THEN 'click' ELSE 'view' END,
+          NOW(), '{"page": "home"}'
+   FROM generate_series(1, 20000) AS t(i);
 ```
 
-**Monitor with Grafana**: http://localhost:3000 (admin/admin)
-
-## 📋 Requirements
+## Requirements
 
 - 8GB+ RAM recommended
 - macOS (arm64) or Linux (x64, arm64)
-- Docker optional (for Grafana, Minio)
+- Docker optional (for Grafana, MinIO)
 
-## 📋 Changelog
+## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for version history and release notes.
 
