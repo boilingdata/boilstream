@@ -36,16 +36,16 @@ Download, start, and connect with any Postgres-compatible BI tool. Data streams 
 
 ```bash
 # Download (linux-x64, linux-aarch64, darwin-aarch64)
-curl -L -o boilstream https://www.boilstream.com/binaries/darwin-aarch64/boilstream-0.8.4
-curl -L -o boilstream-admin https://www.boilstream.com/binaries/darwin-aarch64/boilstream-admin-0.8.4
+curl -L -o boilstream https://www.boilstream.com/binaries/darwin-aarch64/boilstream-0.9.0
+curl -L -o boilstream-admin https://www.boilstream.com/binaries/darwin-aarch64/boilstream-admin-0.9.0
 chmod +x boilstream boilstream-admin
 
 SERVER_IP_ADDRESS=1.2.3.4 ./boilstream
 
-# Docker: boilinginsights/boilstream:x64-linux-0.8.4 or :aarch64-linux-0.8.4
+# Docker: boilinginsights/boilstream:x64-linux-0.9.0 or :aarch64-linux-0.9.0
 docker run -v ./config.yaml:/app/config.yaml \
    -p 443:443 -p 5432:5432 -p 50051:50051 -p 50250:50250 \
-   -e SERVER_IP_ADDRESS=1.2.3.4 boilinginsights/boilstream:aarch64-linux-0.8.4
+   -e SERVER_IP_ADDRESS=1.2.3.4 boilinginsights/boilstream:aarch64-linux-0.9.0
 ```
 
 > _Use the accompanying `docker-compose.yml` to start Grafana and MinIO_

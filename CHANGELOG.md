@@ -5,6 +5,67 @@ All notable changes to BoilStream will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-04-08
+
+### Features
+
+- **Materialized Views (Windowed Aggregations)**: Tumbling and sliding window aggregations over streaming data
+  - `CREATE MATERIALIZED VIEW ... WITH (window_type, window_size, timestamp_column)` DDL
+  - Tumbling windows (non-overlapping) and sliding windows (overlapping with `slide_interval`)
+  - Ingestion timestamp mode: omit `timestamp_column` to window by server ingestion time (`__boils_meta_timestamp`)
+  - Wall-clock aligned window boundaries at Unix epoch multiples
+  - Automatic `window_start` and `window_end` column injection for consumer-side deduplication
+  - Crash recovery with PostgreSQL watermark persistence — no duplicate or skipped windows on restart
+  - Dual semaphore executor: fast views (< 60s) get priority, slow views (≥ 60s) capped at N-1 slots
+  - Per-view FIFO queue with round-robin dequeue — no dropped windows on backpressure
+  - All standard aggregations: COUNT, SUM, AVG, MIN, MAX, PERCENTILE, MEDIAN, MODE, approx_count_distinct
+
+- **CREATE/DROP STREAMING VIEW DDL**: Row-by-row derived topics with continuous SQL transformations
+  - `CREATE STREAMING VIEW name AS SELECT ... FROM source WHERE ...`
+  - `DROP STREAMING VIEW [IF EXISTS] name`
+  - Supports filtering (WHERE), projections, CASE expressions, scalar functions (UPPER, DATE_TRUNC, casts)
+  - Three-level view hierarchy: `CREATE VIEW` (query-time) → `CREATE STREAMING VIEW` (continuous row-level) → `CREATE MATERIALIZED VIEW` (windowed aggregation)
+
+- **Tantivy Full-Text Search**: Per-table full-text search indexing with two-tier hot/cold architecture
+  - Enable via `ALTER TABLE ... SET (tantivy_enabled=true, tantivy_text_fields='col1,col2')`
+  - **Tantivy-only mode**: set `parquet_enabled=false` for search-only tables without Parquet overhead
+  - Hot tier: local disk indexes, searchable within seconds of ingestion
+  - Cold tier: segments packed into `.bundle` files and uploaded to S3, registered in DuckLake
+  - Shadow DuckLake table (`{table}__tantivy_idx`) automatically tracks all cold tier bundles
+  - Query with `multilake_search(catalog, shadow_table, query [, limit])` — returns results with `_score` relevance column
+  - Automatic Arrow-to-tantivy type mapping: TEXT (tokenized), STRING (exact-match), numeric/timestamp (range queries)
+
+- **Tenant Management**: Multi-tenant config schema, tenant admin API endpoints, dashboard, landing page, and member management
+- **Auth Invite System**: Auto-create tenant at signup with URL-based invite tokens
+- **Playwright Smoke Tests**: End-to-end browser smoke tests for auth flows
+
+### Fixes
+
+- **Schema Registry cascade**: Soft-delete schema_registry entries when topics are deleted, preventing stale topic_id references after DROP/CREATE cycles
+- **Schema re-registration**: Clear `deleted_at` on schema re-registration to fix ghost soft-deleted entries after table recreation
+- **Matview TIMESTAMP stats**: Convert TIMESTAMP column statistics from epoch integers to ISO strings for correct DuckLake registration
+- **Matview persistence**: Harden matview persistence load and window boundary alignment
+- **Tantivy S3 paths**: Fixed S3 key prefix stripping, shadow table data_path handling, and double-slash prevention in upload paths
+- **Tantivy shutdown**: Fixed shutdown hang and durability ack broadcasting in tantivy-only mode
+- **Tantivy shadow tables**: Create via DuckDB DDL instead of direct SQL for proper catalog integration
+- **PgWire ATTACH performance**: Fixed clean-data ATTACH hang where all connections timed out at 15s. Moved role/schema setup to normal user init path, skip redundant work on DuckLake self-connections, and spawn post-ATTACH index creation as background tasks. 30-user concurrent P99: 15s → 800ms
+- **PgWire ATTACH hang**: Fixed DuckLake ATTACH hanging after raw bytes relay by resetting client state
+- **PgWire deadlock**: Eliminated `get_duckdb_context()` deadlock in streaming INSERT detection
+- **PgWire streaming view errors**: Hardened CREATE/DROP STREAMING VIEW error handling with rollback on failure
+- **Session init timeout**: Added initialization timeout to prevent indefinite connection hangs
+- **DuckLake auto-attach**: Fixed `memory` database context being lost after DuckLake auto-attach
+- **DuckLake ATTACH regression**: Fixed topic name resolution for ALTER TABLE after ATTACH
+- **DuckLake table_id collision**: Fixed CDC metadata query collision when DuckLake reuses table_id values
+- **Self-connection stability**: Replaced connection abort with `pg_connection_limit=2` and idle timeout cleanup
+- **Airport loopback**: Fixed table discovery and schema mapping for streaming INSERT
+- **Auth dark mode**: Corrected CSS variables across all UI files
+
+### Improvements
+
+- **PgWire performance**: Eliminated redundant SQL parsing in Extended Query protocol, added AST caching for parse_sql and detect_client_type
+- **PgWire refactor**: Extracted shared cursor handlers, query classification, and streaming INSERT detection into reusable modules
+- **Matview executor**: Redesigned to connect via pgwire as regular client with tenant isolation, replacing direct DuckDB access
+
 ## [0.8.4] - 2026-02-24
 
 ### Features
