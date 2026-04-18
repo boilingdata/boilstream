@@ -1,0 +1,25 @@
+# Patterns to ignore when building packages.
+# These artifacts will not be added to the chart tarball produced by
+# `helm package`. Files matching the patterns below are excluded by default.
+.DS_Store
+.git/
+.gitignore
+.bzr/
+.hg/
+.hgignore
+.svn/
+*.swp
+*.bak
+*.tmp
+*.orig
+*~
+# IDE
+.vscode/
+.idea/
+# Tooling
+.helmignore
+.tool-versions
+# Tests / chart development
+ci/
+tests/
+*.tgz

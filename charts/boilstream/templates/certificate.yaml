@@ -1,0 +1,21 @@
+{{- if not .Values.tls.existingSecret }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: boilstream-wildcard
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "boilstream.labels" . | nindent 4 }}
+spec:
+  secretName: boilstream-wildcard-tls
+  commonName: "*.{{ .Values.domain }}"
+  dnsNames:
+    - "*.{{ .Values.domain }}"
+    - "{{ .Values.domain }}"
+  issuerRef:
+    name: {{ .Values.tls.issuer.name }}
+    kind: {{ .Values.tls.issuer.kind }}
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+{{- end }}

@@ -1,0 +1,507 @@
+# BoilStream Default Configuration
+# This configuration provides a working out-of-the-box experience
+# - DuckDB persistence enabled for local data storage
+# - NoOp primary storage (no external dependencies)
+# - PGWire enabled for SQL queries on port 5432
+# - Kafka enabled for producer ingestion on port 9092
+# - All data stored locally under /tmp
+
+# AWS Configuration (not used with NoOp storage)
+aws:
+  region: "us-east-1"
+  https_conn_pool_size: 100
+
+# Storage Configuration - NoOp storage for zero dependencies
+storage:
+  backends:
+    - name: "noop-primary"
+      backend_type: "noop"
+      enabled: true
+      primary: true  # Primary backend - no actual storage
+    # Example: Local MinIO S3 configuration (disabled by default)
+    # - name: "local-minio"
+    #   backend_type: "s3"
+    #   enabled: false
+    #   primary: false
+    #   endpoint: "http://localhost:9000"
+    #   access_key: "minioadmin"
+    #   secret_key: "minioadmin"
+    #   region: "us-east-1"
+    #   use_path_style: true  # Required for MinIO
+    #   bucket: "boilstream-data"
+    #   prefix: "/"
+    #   max_concurrent_uploads: 100
+    #   max_retries: 3
+    #   initial_backoff_ms: 100
+    #   max_retry_attempts: 3
+    # Example: Real AWS S3 configuration (disabled by default)
+    # - name: "aws-s3"
+    #   backend_type: "s3"
+    #   enabled: false
+    #   primary: false
+    #   region: "us-west-2"
+    #   bucket: "your-bucket-name"
+    #   prefix: "/data"
+    #   # access_key and secret_key can be omitted to use IAM roles/AWS CLI credentials
+    #   # access_key: "your-access-key"
+    #   # secret_key: "your-secret-key"
+    #   max_concurrent_uploads: 100
+    #   max_retries: 3
+    #   initial_backoff_ms: 100
+    #   max_retry_attempts: 3
+    # Example: Azure Blob Storage configuration (disabled by default)
+    # - name: "azure-blob"
+    #   backend_type: "azure"
+    #   enabled: false
+    #   primary: false
+    #   azure_account: "mystorageaccount"
+    #   azure_container: "boilstream-data"
+    #   prefix: "/data"
+    #   # azure_access_key: "your-access-key"  # Optional, uses Azure SDK credentials if not specified
+    # Example: Google Cloud Storage configuration (disabled by default)
+    # - name: "gcp-storage"
+    #   backend_type: "gcp"
+    #   enabled: false
+    #   primary: false
+    #   bucket: "boilstream-data-gcs"
+    #   prefix: "/data"
+    #   gcp_project_id: "your-gcp-project"
+    #   # gcp_service_account_key: "/path/to/service-account.json"  # Optional, uses default credentials if not specified
+    # Example: Filesystem storage (disabled by default)
+    # - name: "local-filesystem"
+    #   backend_type: "filesystem"
+    #   enabled: false
+    #   primary: false
+    #   prefix: "/tmp/boilstream/storage"
+
+# Server Configuration
+server:
+  flight_base_port: 50050
+  consumer_flight_port: 50250  # Consumer Flight port for data consumption
+  router:
+    spsc_queue_capacity: 2
+    batch_size: 200
+    retry_delay_ms: 1
+
+# Data Processing Configuration
+processing:
+  data_processing_threads: 4
+  buffer_pool_max_size: 50
+  window_queue_capacity: 30000
+  max_flush_latency_ms: 1000     # Max time before flush/upload
+  max_part_size_mb: 8            # Size threshold for early flush
+  max_file_size_mb: 100          # Max file size before forced completion
+  enable_5mb_part_padding: false # Pad buffers to 5MB for S3 multipart (false = direct upload for small parts)
+  include_metadata_columns: true
+  schema_validation_enabled: true
+  parquet:
+    compression: "ZSTD"
+    dictionary_enabled: true
+
+# DuckDB Topic Persistence Configuration - ENABLED for local storage
+duckdb_persistence:
+  enabled: true
+  storage_path: "/tmp/boilstream/duckdb"
+  max_writers: 10
+
+# Embedded PostgreSQL Configuration for DuckLake metadata catalogs
+# Automatically starts a PostgreSQL instance for DuckLake metadata storage
+embedded_postgres:
+  enabled: true  # Enable for local development with DuckLake
+  port: 5433     # Port for PostgreSQL (default: 5433)
+  databases:     # Databases to create on startup
+    - "ducklake_catalog"    # Shared catalog database with schema-per-catalog isolation (REQUIRED for CDC)
+    - "ducklake_analytics"  # Optional: Analytics database
+    - "ducklake_default"    # Optional: Default database
+
+# DuckLake Configuration for ACID transactions and metadata management
+# Note: Requires DuckLake extension to be available in DuckDB
+# ducklake:
+#   - name: my_ducklake
+#     # Data path where Parquet files are stored (must match storage backend path)
+#     # For reconciliation and configuration validation (we don't want to try to parse the SQL to find the data path)
+#     data_path: "s3://ingestion-data/"
+#     # See https://ducklake.select/docs/stable/duckdb/usage/connecting#parameters
+#     attach: |
+#       FROM duckdb_secrets();
+#       -- Load extensions
+#       INSTALL ducklake;
+#       INSTALL postgres;
+#       INSTALL aws;
+#       INSTALL httpfs;
+#       LOAD ducklake;
+#       LOAD postgres;
+#       LOAD aws;
+#       LOAD httpfs;
+#       -- S3 access for MinIO
+#       CREATE OR REPLACE SECRET secretForDirectS3Access (
+#           TYPE S3,
+#           KEY_ID 'minioadmin',
+#           SECRET 'minioadmin',
+#           REGION 'us-east-1',
+#           ENDPOINT 'localhost:9000',
+#           USE_SSL false,
+#           URL_STYLE 'path',
+#           SCOPE 's3://ingestion-data/'
+#       );
+#       -- PostgreSQL secret for DuckLake catalog backend
+#       CREATE OR REPLACE SECRET postgres (
+#         TYPE POSTGRES,
+#         HOST 'localhost',
+#         PORT 5433,
+#         DATABASE 'boilstream',
+#         USER 'postgres',
+#         PASSWORD 'postgres'
+#       );
+#       -- DuckLake Postgres catalog
+#       CREATE OR REPLACE SECRET pg_secret (
+#         TYPE DUCKLAKE,
+#         METADATA_PATH '',
+#         DATA_PATH 's3://ingestion-data/',
+#         METADATA_PARAMETERS MAP {'TYPE': 'postgres', 'SECRET': 'postgres'}
+#       );
+#       -- DuckLake attachment with Postgres catalog
+#       ATTACH 'ducklake:pg_secret' AS my_ducklake;
+#     # Optional: Specify which topics to include (if not specified, all topics are included)
+#     # topics: ["events", "people"]
+#     # Reconciliation settings for ensuring S3 and DuckLake are synchronized
+#     reconciliation:
+#       on_startup: true                  # Run reconciliation when application starts
+#       interval_minutes: 10              # Check for missing files
+#       max_concurrent_registrations: 10  # Parallel registration limit
+
+# PGWire PostgreSQL Protocol Configuration - ENABLED
+pgwire:
+  enabled: true
+  port: 5432
+  refresh_interval_seconds: 10
+  metadata_db_path: "/tmp/boilstream/metadata.duckdb"
+  initialization_sql: |
+    SET threads = 8;
+    SET memory_limit = '24GB';
+    SET max_temp_directory_size = '16GB';
+    SET allowed_directories = ['/tmp'];
+    SET allow_unsigned_extensions = false;
+    SET allow_persistent_secrets = false;
+    SET allow_unredacted_secrets = false;
+    INSTALL json;
+    LOAD json;
+    INSTALL ducklake;
+    LOAD ducklake;
+    INSTALL boilstream FROM community;
+    LOAD boilstream;
+    SET lock_configuration = true;
+  # Connection Management and Robustness Settings
+  query_timeout_seconds: 300        # 5 minutes - maximum time for a single query
+  max_connections: 100              # Maximum number of concurrent connections
+  idle_timeout_seconds: 900         # 15 minutes - idle connections cleanup interval (must be >= 2x query_timeout)
+  connection_timeout_seconds: 1800  # 30 minutes - maximum time a connection can be active (for long downloads)
+  init_timeout_seconds: 30          # 30 seconds - maximum time for connection initialization (user lookup, bootstrap, catalog attach)
+  # Metadata database backup configuration (optional)
+  # metadata_backup_backend: "noop-primary"  # References a storage backend name from storage.backends
+  # metadata_backup_interval_seconds: 60     # How often to backup (default: 60)
+  # metadata_backup_path: "pgwire/metadata-backup.tar.gz"  # Path in backend for backup (encrypted Parquet export)
+  # Multi-tenant isolation: base path for tenant data directories
+  # Each tenant gets a chroot to {tenant_data_base_path}/{tenant_id}/
+  tenant_data_base_path: "/tmp/boilstream/tenants"
+  tls:
+    enabled: false  # Disabled for development
+    # For production, enable TLS and provide certificates:
+    # cert_path: "/path/to/pgwire_cert.pem"
+    # key_path: "/path/to/pgwire_key.pem"
+    # Or use PEM strings directly:
+    # cert_pem: "-----BEGIN CERTIFICATE-----\n..."
+    # key_pem: "-----BEGIN PRIVATE KEY-----\n..."
+
+# Kafka Producer Protocol Configuration
+# Supports SASL_SSL authentication using web tokens from dashboard
+kafka:
+  enabled: true
+  port: 9092
+  bind_address: "0.0.0.0"
+  tls:
+    enabled: false  # Enable for production with SASL_SSL
+    # Provide certificates via files:
+    # cert_path: "/path/to/kafka_cert.pem"
+    # key_path: "/path/to/kafka_key.pem"
+    # Or use PEM strings directly (for K8s secrets, etc.):
+    # cert_pem: "-----BEGIN CERTIFICATE-----\n..."
+    # key_pem: "-----BEGIN PRIVATE KEY-----\n..."
+  # Note: When auth_server is enabled, Kafka uses SASL/PLAIN with web tokens
+  # Client config: security.protocol=SASL_SSL, sasl.mechanism=PLAIN
+  # sasl.username=<topic_name>, sasl.password=<web_token_from_dashboard>
+
+# ML Inference Configuration (Optional)
+# Uncomment and configure to enable ML inference capabilities
+# ml_inference:
+#   enabled: true
+#   models:
+#     # Example: Text embeddings model
+#     - model_id: 1
+#       model_name: "text-embeddings"
+#       model_type: "embeddings"
+#       model_path: "/models/embeddings.safetensors"
+#       device: "cpu"
+#       batch_size: 32
+#       config: {}
+#     # Example: Classification model
+#     - model_id: 2
+#       model_name: "sentiment-classifier"
+#       model_type: "classification"
+#       model_path: "/models/classifier.onnx"
+#       device: "cpu"
+#       batch_size: 64
+#       config:
+#         num_classes: 3
+#   topic_mappings:
+#     # Map models to topics using topic names
+#     - topic_name: "user_events"
+#       model_id: 1
+#       input_columns: ["text"]
+#       output_column: "embedding"
+#     - topic_name: "product_reviews"
+#       model_id: 2
+#       input_columns: ["review_text"]
+#       output_column: "sentiment"
+
+# Rate Limiting Configuration
+rate_limiting:
+  disabled: false
+  max_requests: 1000
+  burst_limit: 1500
+  global_limit: 5000
+
+# TLS Configuration
+tls:
+  disabled: true  # Disabled for development
+  # cert_path: "/path/to/cert.pem"
+  # key_path: "/path/to/key.pem"
+  # cert_pem: "-----BEGIN CERTIFICATE-----\n..."
+  # key_pem: "-----BEGIN PRIVATE KEY-----\n..."
+  # grpc_default_ssl_roots_file_path: "/path/to/ca-certificates.crt"
+
+# Authentication Configuration - Disabled for development
+auth:
+  providers: []
+  authorization_enabled: false
+  admin_groups: []
+  read_only_groups: []
+  max_sessions_per_hour: 1000  # Rate limit for session creation per user
+  max_concurrent_sessions: 20  # Maximum active sessions per user
+  max_session_ttl_hours: 8     # Maximum session lifetime in hours
+  cognito:
+    # user_pool_id: "us-east-1_example"
+    # region: "us-east-1"
+    # audience: "client-id"
+  azure:
+    # tenant_id: "tenant-id"
+    # client_id: "client-id"
+    allow_multi_tenant: false
+  gcp:
+    # client_id: "client-id"
+    # project_id: "project-id"
+    require_workspace_domain: false
+  auth0:
+    # tenant: "your-tenant.auth0.com"
+    # audience: "your-api-identifier"
+    # groups_namespace: "https://your-app.com/groups"
+  okta:
+    # org_domain: "your-org.okta.com"
+    # audience: "api://your-audience"
+    # auth_server_id: "your-auth-server"
+
+# Metrics Configuration
+metrics:
+  port: 8081
+  flush_interval_ms: 1000
+
+# Logging Configuration
+logging:
+  rust_log: "info"
+
+# Audit Logging Configuration - SOC2/ISO Compliance
+audit:
+  enabled: false  # Disabled by default for backward compatibility
+  backend: ndjson  # Options: ndjson, duckdb (future), s3 (future), disabled
+  log_path: "./logs/audit"  # Base directory for Hive partitioning (year=YYYY/month=MM/day=DD/hour=HH/audit.ndjson)
+  buffer_size: 1000  # Events to batch before flushing
+  sample_rate: null  # Optional sampling (0.0-1.0, null = no sampling)
+  include_query_text: true  # Include SQL queries in logs (may contain PII)
+  include_ip_address: true  # Include client IP addresses (may be PII)
+
+# HTTP Ingestion Configuration (Browser-based Arrow data)
+http_ingestion:
+  enabled: false  # Disabled by default, enable for browser ingestion
+  port: 443
+  bind_address: "0.0.0.0"
+  
+  # TLS configuration (required when enabled)
+  tls:
+    cert_path: "./test-certs/localhost.crt"
+    key_path: "./test-certs/localhost.key"
+  
+  # CORS configuration for browser access
+  cors:
+    allowed_origins:
+      - "https://app.example.com"
+      - "https://dashboard.example.com"
+    max_age_seconds: 3600
+    allow_credentials: false
+  
+  # Rate limiting per tenant
+  rate_limiting:
+    enabled: true
+    global_requests_per_second: 10000  # Total across all tenants
+    tenant_requests_per_second: 1000   # Default per tenant
+    tenant_burst_size: 5000            # Burst capacity per tenant
+    tenant_overrides: {}                # Custom limits per tenant_id
+      # Example overrides:
+      # 1:  # tenant_id 1
+      #   requests_per_second: 2000
+      #   burst_size: 10000
+  
+  # HTTP/2 settings optimized for browser connections
+  http2:
+    max_connections: 100000                    # Max concurrent connections
+    accept_threads: 0                          # 0 = number of CPU cores
+    initial_stream_window_size: 262144         # 256KB for up to 128KB packets
+    initial_connection_window_size: 1048576    # 1MB for multiple streams
+    max_frame_size: 131072                     # 128KB frames
+    max_concurrent_streams: 50                 # Per connection
+    keep_alive_interval_secs: 20
+    keep_alive_timeout_secs: 10
+  
+  # Secret key for token validation (32 bytes, base64 encoded)
+  # Generate with: openssl rand -base64 32
+  token_secret_key: "CHANGE_THIS_SECRET_KEY_BASE64_ENCODED_32_BYTES"
+  
+  # Maximum request size (128KB for browser compatibility)
+  max_request_size: 131072
+  
+  # Memory pool configuration for zero-copy buffer management
+  memory_pool:
+    buffer_size: 131072    # 128KB per buffer (typical browser payload size)
+    buffer_count: 2000     # 2000 buffers = 256MB total memory pool
+
+# Authentication Server Configuration
+# Provides OAuth-based authentication for generating temporary PGWire credentials
+auth_server:
+  enabled: true  # Set to true to enable auth server
+  enable_ducklake: true
+  auto_create_default_ducklake: true  # Auto-create "duckie" catalog for new users
+  port: 443      # HTTPS port for auth landing page
+  tls_cert: "./test-certs/localhost.crt"
+  tls_key: "./test-certs/localhost.key"
+
+  # TLS Certificate Auto-Reload (for Let's Encrypt / certbot)
+  # Monitors certificate files for changes and reloads without server restart
+  # tls_auto_reload: true  # Enable/disable auto-reload (default: true when certs configured)
+  # tls_reload_check_interval_seconds: 21600  # Check every 6 hours (default: 21600)
+  # Let's Encrypt certificates are valid for 90 days and renewed at 30 days remaining
+  # Certbot runs twice daily, so checking every 6-12 hours is optimal
+  # Example for Let's Encrypt with certbot:
+  # tls_cert: "/etc/letsencrypt/live/app.boilstream.com/fullchain.pem"
+  # tls_key: "/etc/letsencrypt/live/app.boilstream.com/privkey.pem"
+
+  # Note: Static web UI files (HTML, CSS, JS) are embedded in the binary at compile time
+  # No external files are needed at runtime - single binary deployment!
+
+  session_ttl_hours: 8            # TTL for generated PGWire credentials
+  users_db_path: "data/users.duckdb"  # Database for user profiles and OAuth sessions
+  encryption_key_path: "data/encryption.key"  # Encryption key file (auto-generated on first run)
+
+  # Superadmin automated setup (optional - for testing/automation)
+  # If these files exist, superadmin credentials are loaded from them on startup
+  # If empty or files don't exist, superadmin setup is done interactively or skipped
+  superadmin_password_path: "data/superadmin_password.txt"
+  superadmin_mfa_secret_path: "data/superadmin_mfa_secret.txt"
+
+  # Application domain for SAML and OAuth callbacks
+  # Used to generate default SP entity IDs and callback URLs
+  app_domain: "app.boilstream.com"  # Your application domain (e.g., "app.example.com")
+
+  # WebAuthn (Passkey) Configuration
+  # Required for passwordless authentication with biometrics/security keys
+  webauthn_rp_id: "localhost"           # Relying Party ID (domain name)
+  webauthn_rp_origin: "https://localhost"  # Full origin URL (must match browser location)
+  # For production, use your actual domain:
+  # webauthn_rp_id: "example.com"
+  # webauthn_rp_origin: "https://example.com"
+
+  # Users database backup configuration (disaster recovery)
+  # users_backup_backend: "noop-primary"    # Name of storage backend to use for backups
+  # users_backup_interval_seconds: 60  # Minimum seconds between backups (default: 60)
+  # users_backup_path: "auth/users.duckdb"  # Path in backend for backup file
+
+  # Optional PGP encryption for deleted account emails (GDPR compliance)
+  # When users delete their accounts, their email can be encrypted with PGP
+  # before storage to comply with GDPR while preserving non-disputability
+  # email_encryption_pgp_public_key_path: "/etc/boilstream/pgp/public.asc"
+  # Or provide the PGP public key directly as a string:
+  # email_encryption_pgp_public_key: |
+  #   -----BEGIN PGP PUBLIC KEY BLOCK-----
+  #   ...
+  #   -----END PGP PUBLIC KEY BLOCK-----
+
+# Cluster Mode Configuration
+# Enables horizontal scaling with leader election and broker registry
+# Required for cluster admin API endpoints (/auth/api/admin/cluster/*)
+# Note: Requires S3/object store backend (not NoOp) to store cluster state
+cluster_mode:
+  enabled: true
+  # Path to persistent node ID file (generated on first start, reused on restart)
+  # Required for proper leader election after restart - without this, each restart
+  # generates a new node_id and the node won't reclaim leadership
+  node_id_path: "./node_id"
+  advertised_host: "localhost"
+  internal_api_port: 8444
+  leader_heartbeat_interval_secs: 30
+  leader_stale_threshold_secs: 120
+  broker_heartbeat_interval_secs: 30
+  broker_stale_threshold_secs: 120
+
+# OAuth Providers Configuration
+oauth_providers:
+  # GitHub OAuth Configuration with RBAC
+  # github:
+  #   client_id: "${GITHUB_CLIENT_ID}"
+  #   client_secret: "${GITHUB_CLIENT_SECRET}"
+  #   redirect_uri: "https://yourdomain.com/auth/callback"
+  #   # Organization access control (empty list = all orgs allowed)
+  #   # Users must be members of at least one listed org to access
+  #   allowed_orgs:
+  #     - "your-org-name"
+  #     - "another-allowed-org"
+  #   # Map GitHub teams to database roles (admin, write, read)
+  #   # Format: "org-name/team-slug": "role"
+  #   # Users get all roles from their team memberships
+  #   team_role_mappings:
+  #     "your-org-name/admin-team": "admin"
+  #     "your-org-name/engineering": "write"
+  #     "your-org-name/support": "read"
+  #     "another-allowed-org/developers": "write"
+  #   # Always fetch orgs/teams for audit logging even without RBAC (default: false)
+  #   audit_org_teams: false
+
+  # Google OAuth Configuration
+  # google:
+  #   client_id: "${GOOGLE_CLIENT_ID}"
+  #   client_secret: "${GOOGLE_CLIENT_SECRET}"
+  #   redirect_uri: "https://yourdomain.com/auth/callback"
+  #   allowed_domains: ["yourdomain.com"]  # List of allowed email domains
+
+# Tantivy full-text search indexing (disabled by default)
+# tantivy:
+#   enabled: false
+#   data_dir: "./data/tantivy"
+#   arena_mb: 50                    # Per-shard memory arena in MB
+#   commit_interval_secs: 30        # Segment commit interval
+#   writer_threads_per_topic: 4     # Number of writer threads (shards) per topic
+#   hot_segments_to_keep: 2         # Hot segments to keep locally after cold tier confirms
+#   s3_upload_enabled: true         # Enable cold tier upload to S3
+#   bundle_buffer_pool_size: 8      # Pool buffers for segment bundle packing
+#   bundle_buffer_size_mb: 64       # Initial buffer size per bundle in MB
+#   channel_capacity: 32            # Bounded channel capacity for tantivy sink
+#   upload_retry_max: 10            # Max S3 upload retries
+#   upload_retry_base_delay_ms: 1000 # Retry backoff base delay in ms
+#   enable_for_all_topics: false    # Enable tantivy for ALL provisioned topics

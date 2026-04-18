@@ -5,6 +5,47 @@ All notable changes to BoilStream will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2026-04-18
+
+### Features
+
+- **Official Kubernetes Helm Chart**: Production-ready chart for multi-pod cluster deployments
+  - StatefulSet with headless Service for stable per-pod DNS
+  - Per-pod ClusterIP Services exposing PGWire, Kafka, FlightRPC, auth, and cluster ports
+  - Envoy Gateway integration with TLS passthrough + SNI-based routing — one external LoadBalancer IP terminates all protocols across all pods
+  - cert-manager wiring: public wildcard cert (Let's Encrypt ACME, DNS-01 or HTTP-01) and a separate internal CA for pod-to-pod mTLS
+  - PodDisruptionBudget, standard `app.kubernetes.io/*` labels, configurable `affinity` / `nodeSelector` / `tolerations` / `topologySpreadConstraints`
+  - `preStop` hook + `terminationGracePeriodSeconds` for graceful connection drain during rolling updates
+  - IRSA / Pod Identity annotations for AWS; image pull secrets for private registries
+  - Superadmin password and MFA secret sourced from pre-created `Secret`s — never committed to values
+  - Example overlays: `values-eks-example.yaml` (AWS / NLB) and `values-hetzner-example.yaml` (CloudFleet / Hetzner ARM64)
+  - K8s production-readiness test suite under `tests/k8s/` (pod health, leader election, broker registry, SNI routing, failover)
+
+- **Cluster-Mode mTLS**: Pod-to-pod cluster coordination traffic can now be encrypted with mutual TLS
+  - Separate trust root from the public-facing cert — internal CA is isolated from browser trust
+  - `cluster_mode.tls.{cert_path,key_path,ca_cert_path,require_client_cert}` configuration block
+  - `require_client_cert` is now enforced at the TLS handshake (not just at the application layer)
+  - Works out of the box with the chart's cert-manager `ClusterIssuer`
+
+- **PGWire Direct-TLS ALPN**: Server now advertises the `postgresql` ALPN token during TLS negotiation, enabling `libpq >= 18` direct-TLS clients to connect without a downgrade round-trip
+
+- **DuckDB 1.5.2**: Upgraded from 1.4.4 LTS
+  - New PostgreSQL type inference for `format_type(oid, typmod)` parameter binding — now infers `[INT8, INT4]` (was `[TEXT, INT4]`). BI tools that previously relied on the old inference may need to cast explicitly
+  - Inherits all DuckDB 1.5.x improvements (planner, vector operations, extension loader)
+
+### Fixes
+
+- **Leader heartbeat on non-AWS S3**: Heartbeat now retries with a re-read confirmation and an unconditional PUT fallback when `If-Match` ETag comparisons fail. Fixes stalled leadership on S3 implementations where ETags don't round-trip identically between GET and PUT (Hetzner Object Storage, some MinIO configurations)
+- **Cluster-sync mTLS server on promotion**: The internal coordination server now starts when a worker is promoted to leader mid-life (previously only started at boot for pods that booted as leader — caused failover gaps)
+- **Auth server loopback TLS**: The auth server on `:8443` now presents a self-signed loopback certificate for `localhost` / `127.0.0.1` SNI connections and the public cert for its real hostname. Fixes in-pod TLS handshakes when the public cert doesn't cover loopback addresses (e.g. Let's Encrypt deployments)
+
+### Improvements
+
+- **WebAuthn / RP config from single source**: The Helm chart now propagates `values.domain` into both `webauthn_rp_id` and `webauthn_rp_origin`, removing one place where the external hostname could drift
+- **Helm chart de-localized**: Example charts no longer embed localhost certificates or hard-coded dev hostnames — production deploys use real FQDNs end-to-end
+- **boilstream-admin wrapper for K8s**: New `scripts/boilstream-admin-k8s.sh` reads CA, superadmin password, and MFA secret live from Kubernetes `Secret`s; computes TOTP locally and execs the admin CLI against the in-cluster deployment
+- **`testMode.disableTurnstile` chart value**: Lets CI/test clusters skip the Turnstile CAPTCHA on `/auth/email/signup` without rebuilding the image
+
 ## [0.9.0] - 2026-04-08
 
 ### Features

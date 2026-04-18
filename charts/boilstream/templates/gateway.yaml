@@ -1,0 +1,70 @@
+{{- if .Values.gateway.enabled }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: boilstream
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "boilstream.labels" . | nindent 4 }}
+  {{- with .Values.gateway.serviceAnnotations }}
+  annotations:
+    # Envoy Gateway propagates these to the LB Service it provisions.
+    {{- range $k, $v := . }}
+    {{ $k | quote }}: {{ $v | quote }}
+    {{- end }}
+  {{- end }}
+spec:
+  gatewayClassName: {{ .Values.gateway.className }}
+  listeners:
+    - name: pgwire
+      protocol: TLS
+      port: 5432
+      tls: { mode: Passthrough }
+      allowedRoutes:
+        namespaces: { from: Same }
+        kinds: [ { kind: TLSRoute } ]
+    - name: kafka
+      protocol: TLS
+      port: 9092
+      tls: { mode: Passthrough }
+      allowedRoutes:
+        namespaces: { from: Same }
+        kinds: [ { kind: TLSRoute } ]
+    - name: flight
+      protocol: TLS
+      port: 50050
+      tls: { mode: Passthrough }
+      allowedRoutes:
+        namespaces: { from: Same }
+        kinds: [ { kind: TLSRoute } ]
+    - name: auth
+      protocol: TLS
+      port: 8443
+      tls: { mode: Passthrough }
+      allowedRoutes:
+        namespaces: { from: Same }
+        kinds: [ { kind: TLSRoute } ]
+---
+{{- $vals := . -}}
+{{- range $i, $_ := until (int .Values.replicas) }}
+{{- range $listener := list "pgwire" "kafka" "flight" "auth" }}
+{{- $port := index (dict "pgwire" 5432 "kafka" 9092 "flight" 50050 "auth" 8443) $listener }}
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: TLSRoute
+metadata:
+  name: boilstream-{{ $i }}-{{ $listener }}
+  namespace: {{ $vals.Values.namespace }}
+spec:
+  parentRefs:
+    - { name: boilstream, sectionName: {{ $listener }} }
+  hostnames:
+    - boilstream-{{ $i }}.{{ $vals.Values.domain }}
+  rules:
+    - backendRefs:
+        - name: boilstream-{{ $i }}
+          port: {{ $port }}
+---
+{{- end }}
+{{- end }}
+{{- end }}
+

@@ -1,0 +1,19 @@
+{{- if .Values.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: boilstream
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "boilstream.labels" . | nindent 4 }}
+spec:
+  # Defaults to maxUnavailable=1 — voluntary disruptions (drain, node upgrade)
+  # can take at most one pod at a time. Cluster never loses leader+majority.
+  {{- if .Values.podDisruptionBudget.minAvailable }}
+  minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
+  {{- else }}
+  maxUnavailable: {{ .Values.podDisruptionBudget.maxUnavailable | default 1 }}
+  {{- end }}
+  selector:
+    matchLabels: { app: boilstream }
+{{- end }}

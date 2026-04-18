@@ -1,0 +1,40 @@
+name: Publish Helm Chart
+
+on:
+  push:
+    tags:
+      - "chart-v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Chart version tag (e.g. 0.3.0)"
+        required: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.15.0
+
+      - name: Lint
+        run: helm lint charts/boilstream
+
+      - name: Package
+        run: helm package charts/boilstream -d dist/
+
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Push chart
+        run: |
+          CHART_TGZ=$(ls dist/boilstream-*.tgz | head -n1)
+          helm push "$CHART_TGZ" oci://ghcr.io/boilingdata/charts

@@ -1,0 +1,136 @@
+# Local-dev defaults — see values-eks-example.yaml for production-shaped values.
+
+replicas: 3
+namespace: boilstream
+
+# Whether the chart should create the Namespace. False is the safe default for
+# operators using `helm install --create-namespace` or pre-creating namespaces
+# with custom labels/quotas/annotations. Local-dev defaults to true here only
+# because the OrbStack flow installs the chart into a fresh ns from scratch.
+namespaceCreate: true
+
+image:
+  repository: boilstream
+  tag: local-1.5.2
+  pullPolicy: Never                   # IfNotPresent in real deployments
+  # Image pull secrets for private registries (ECR, GHCR with auth, paid Docker Hub).
+  # List of {name: <secret-name>} pairs; the Secrets must already exist in the namespace.
+  pullSecrets: []
+  #   - name: regcred
+
+# Public hostname pattern for clients. Each pod is reached as
+# <pod-name>.<domain>:<port> via SNI through Envoy Gateway.
+domain: boilstream.test
+
+# S3 / object storage for cluster coordination + per-user catalog backups.
+s3:
+  endpoint: http://host.docker.internal:9000
+  bucket: cluster-state
+  region: eu-west-1
+  prefix: k8s/
+  forcePathStyle: true                # true for MinIO/RustFS, false for AWS S3
+  # Static credentials. Leave both empty when running on EKS with Pod Identity / IRSA;
+  # the AWS SDK default credential chain will pick the role attached to serviceAccount.
+  accessKey: rustfsadmin
+  secretKey: rustfsadmin
+  # OR: provide creds via an existing Secret (avoids literals in values.yaml /
+  # `helm get values` output). Secret must contain keys 'access_key' and 'secret_key'.
+  existingCredsSecret: ""
+
+resources:
+  requests: { cpu: "500m", memory: "1Gi" }
+  limits:   { cpu: "2", memory: "4Gi" }
+
+# Pod scheduling constraints. Defaults are unrestricted; production overlays
+# typically set podAntiAffinity to spread pods across nodes for HA.
+affinity: {}
+nodeSelector: {}
+tolerations: []
+topologySpreadConstraints: []
+
+# Per-pod auth-server superadmin password. Provide via --set-file from a sealed
+# secrets store in real deployments (or pre-create the Secret and set
+# superadmin.existingSecret to skip ours).
+superadmin:
+  password: "TestPassword123!"        # local dev default — OVERRIDE in prod
+  existingSecret: ""                  # if set, chart won't create the Secret
+  # Optional: Pre-enrolled TOTP MFA secret (base32, 20–32 bytes typically).
+  # When set, points at a K8s Secret containing key 'mfa_secret' which BoilStream
+  # writes to /data/superadmin_mfa_secret.txt at pod start and enrolls into the
+  # superadmin.mfa table on first boot. Enables scripted/programmatic superadmin
+  # access (e.g., boilstream-admin CLI from an operator's laptop). Do NOT share
+  # the Secret beyond the cluster — it's the second factor.
+  existingMfaSecret: ""
+
+# testMode relaxes production safeguards (Turnstile CAPTCHA, etc.) so a cluster
+# can be driven through signup/login flows without a browser. NEVER enable on a
+# cluster that serves real users — anything reachable publicly becomes
+# spam-/bot-abusable. Default false.
+testMode:
+  disableTurnstile: false
+
+# Public-edge TLS (PGWire/Kafka/Flight/auth). cert-manager-issued wildcard
+# *.<domain> by default. Override existingSecret to bring your own Secret
+# (ACM-imported, etc.).
+tls:
+  existingSecret: ""                  # if empty, chart creates one via cert-manager
+  issuer:
+    create: true                      # set false to point at an existing ClusterIssuer
+    name: boilstream-ca-issuer        # name used when create=true OR referenced when create=false
+    kind: ClusterIssuer
+
+# Cluster-internal mTLS (pod-to-pod gRPC on port 8443). Separate cert/CA from
+# the public edge so internal traffic has its own trust root and rotation cadence.
+# When enabled, every pod presents a cert signed by clusterTls.issuer; peers
+# verify each other against the CA bundle in the same Secret.
+clusterTls:
+  enabled: false
+  existingSecret: ""                  # if empty, chart creates one via cert-manager
+  issuer:
+    name: boilstream-ca-issuer        # ClusterIssuer that mints from your private cluster CA
+    kind: ClusterIssuer
+  # Cert SAN list — covers both the headless-Service per-pod DNS and the
+  # short Service name. Matches what cluster_mode.advertised_host produces.
+  dnsNames: []                        # if empty, chart populates with sensible defaults
+
+# Envoy Gateway integration. The GatewayClass must already exist in-cluster
+# (installed by the Envoy Gateway Helm chart).
+gateway:
+  enabled: true
+  className: eg
+  # K8s Service annotations for the gateway-managed Service. On AWS, set NLB
+  # annotations here. On OrbStack/dev, leave empty.
+  serviceAnnotations: {}
+  # Example for EKS:
+  #   service.beta.kubernetes.io/aws-load-balancer-type: external
+  #   service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
+  #   service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+
+# ServiceAccount — set annotations.eks.amazonaws.com/role-arn for Pod Identity / IRSA.
+serviceAccount:
+  create: true
+  name: boilstream
+  annotations: {}
+
+# PodDisruptionBudget — voluntary-disruption guard. With 3 replicas, allowing
+# at most 1 pod down at a time keeps a quorum of 2 available during node
+# drains, K8s upgrades, etc. Override minAvailable for stricter policies
+# (mutually exclusive with maxUnavailable).
+podDisruptionBudget:
+  enabled: true
+  maxUnavailable: 1
+  # minAvailable: 2
+
+# Graceful drain: how long the preStop hook sleeps before SIGTERM hits the
+# main process. Gives Envoy / NLB target group a beat to mark this pod
+# unhealthy and stop sending new connections.
+preStopSleepSeconds: 5
+
+# Pod terminationGracePeriodSeconds — must accommodate BoilStream's S3 flush
+# and leader stepdown. Bigger than preStopSleepSeconds + worst-case flush.
+terminationGracePeriodSeconds: 120
+
+# nameOverride / fullnameOverride — only set if you're running multiple
+# BoilStream releases side-by-side and need distinct resource names.
+nameOverride: ""
+fullnameOverride: ""

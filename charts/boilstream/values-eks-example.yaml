@@ -1,0 +1,61 @@
+# Example values for an AWS EKS deployment.
+#   helm install boilstream ./charts/boilstream \
+#     -f charts/boilstream/values-eks-example.yaml \
+#     --set image.tag=<your-version> \
+#     --set superadmin.existingSecret=boilstream-superadmin
+
+replicas: 3
+namespace: boilstream
+
+image:
+  repository: <your-registry>/boilstream  # e.g. <account>.dkr.ecr.eu-west-1.amazonaws.com/boilstream
+  tag: 0.10.0
+  pullPolicy: IfNotPresent
+
+domain: boilstream.example.com           # *.boilstream.example.com → NLB
+
+s3:
+  endpoint: ""                            # empty → AWS S3
+  bucket: my-boilstream-cluster-state
+  region: eu-west-1
+  prefix: prod/
+  forcePathStyle: false                   # AWS S3 uses virtual-hosted
+  accessKey: ""                           # leave empty — Pod Identity / IRSA supplies creds
+  secretKey: ""
+
+resources:
+  requests: { cpu: "2",   memory: "8Gi" }
+  limits:   { cpu: "4",   memory: "16Gi" }
+
+# Provide via sealed-secrets / external-secrets / SSM-injected Secret.
+superadmin:
+  existingSecret: boilstream-superadmin   # contains key 'password'
+
+# TLS — two patterns:
+# (a) Let cert-manager + ACME (Let's Encrypt + Route 53 DNS-01) issue and rotate:
+tls:
+  existingSecret: ""
+  issuer:
+    create: false
+    name: letsencrypt-route53             # ClusterIssuer you've configured
+    kind: ClusterIssuer
+# (b) ACM-imported cert via a pre-created Secret (cert-manager not required):
+#   existingSecret: boilstream-wildcard-tls
+#   issuer: { create: false }
+
+gateway:
+  enabled: true
+  className: eg
+  serviceAnnotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: external
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
+    service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+    # When you own the DNS zone, external-dns will auto-create wildcard:
+    external-dns.alpha.kubernetes.io/hostname: "*.boilstream.example.com"
+
+serviceAccount:
+  create: true
+  name: boilstream
+  annotations:
+    # EKS Pod Identity — supplies S3 creds via the default AWS chain.
+    eks.amazonaws.com/role-arn: arn:aws:iam::<account-id>:role/boilstream-s3-coordination

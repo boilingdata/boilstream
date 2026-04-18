@@ -1,0 +1,101 @@
+# Hetzner / CloudFleet K8s overlay — Helsinki (hel1) ARM64 nodes, Hetzner Object Storage.
+#
+#   helm install boilstream ./charts/boilstream \
+#     -f charts/boilstream/values-hetzner-example.yaml \
+#     --set image.tag=0.10.0-pro-1.5.2 \
+#     --set superadmin.existingSecret=boilstream-superadmin
+
+replicas: 2                              # 2 nodes, 1 pod each
+namespace: boilstream
+namespaceCreate: true
+
+image:
+  repository: <your-cfcr-tenant>.europe.registry.cloudfleet.dev/boilstream
+  tag: 0.10.0-pro-1.5.2
+  pullPolicy: IfNotPresent
+  pullSecrets: []                        # CFCR auth comes via the cluster's image-pull integration
+
+domain: app.boilstream.com                  # local-test wildcard while we verify; swap for real domain in prod
+
+# Hetzner Object Storage in Helsinki (S3-compatible).
+s3:
+  endpoint: https://hel1.your-objectstorage.com
+  bucket: boilstream-cluster-state-hel1
+  region: hel1
+  prefix: cluster/
+  # Path-style ({endpoint}/{bucket}/{key}) — current BoilStream/object_store
+  # combo doesn't compose virtual-hosted URLs against Hetzner's endpoint correctly,
+  # so the bucket falls out of the URL. Path-style is what works.
+  forcePathStyle: true
+  # S3 creds sourced from a pre-created Secret (keys: access_key, secret_key).
+  # Create with: kubectl -n boilstream create secret generic boilstream-s3-creds \
+  #   --from-literal=access_key=<...> --from-literal=secret_key=<...>
+  existingCredsSecret: boilstream-s3-creds
+  accessKey: ""
+  secretKey: ""
+
+# Conservative requests so Karpenter picks ARM cax21 (4 vCPU, 8 GB).
+# 2 replicas × 1 vCPU/2 GB request = 2/4 GB per pool, leaves room for kube-system
+# and chart-installed envoy/cert-manager pods on the same nodes. Total stays
+# well under the 16 vCPU NodePool cap and the 24 vCPU fleet cap.
+resources:
+  requests: { cpu: "1",   memory: "2Gi" }
+  limits:   { cpu: "2",   memory: "4Gi" }
+
+# Pin to the boilstream-arm64-hel NodePool (arm64 + hel1).
+nodeSelector:
+  boilstream.com/nodepool: arm64-hel
+
+# Hard anti-affinity → exactly one pod per node. With 2 replicas, this forces
+# Karpenter to provision 2 nodes.
+affinity:
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchLabels: { app: boilstream }
+        topologyKey: kubernetes.io/hostname
+
+# Use existing Secret for the superadmin password + MFA secret. Both are managed
+# out of band (kubectl create secret …) so they're never in Helm values output.
+superadmin:
+  existingSecret: boilstream-superadmin
+  existingMfaSecret: boilstream-superadmin-mfa
+
+# Test-mode hatches — only safe on clusters that are not serving real traffic.
+# Disabling Turnstile lets the ingestion test suite sign up users via
+# /auth/email/signup without a captcha token. Remove this block for production.
+testMode:
+  disableTurnstile: true
+
+# TLS — keep self-signed CA for the test deploy; swap for Let's Encrypt + DNS-01
+# (cert-manager Issuer) once a real domain is wired through.
+tls:
+  existingSecret: ""
+  issuer:
+    create: false
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+
+clusterTls:
+  enabled: true
+  existingSecret: ""
+  issuer:
+    name: boilstream-ca-issuer
+    kind: ClusterIssuer
+
+gateway:
+  enabled: true
+  className: eg
+  serviceAnnotations: {}                 # CloudFleet provisions LoadBalancers via Hetzner LB
+
+serviceAccount:
+  create: true
+  name: boilstream
+  annotations: {}
+
+podDisruptionBudget:
+  enabled: true
+  maxUnavailable: 1
+
+terminationGracePeriodSeconds: 120
+preStopSleepSeconds: 5

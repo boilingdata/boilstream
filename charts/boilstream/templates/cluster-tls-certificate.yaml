@@ -1,0 +1,35 @@
+{{- if and .Values.clusterTls.enabled (not .Values.clusterTls.existingSecret) }}
+{{- $defaultDnsNames := list
+    (printf "*.boilstream-headless.%s.svc.cluster.local" .Values.namespace)
+    (printf "boilstream-headless.%s.svc.cluster.local" .Values.namespace)
+    (printf "*.boilstream-headless.%s.svc" .Values.namespace)
+    (printf "boilstream-headless.%s.svc" .Values.namespace)
+}}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: boilstream-cluster-mtls
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "boilstream.labels" . | nindent 4 }}
+spec:
+  secretName: boilstream-cluster-mtls
+  commonName: boilstream-cluster
+  # Used both as server cert (when peer dials this pod) and as client cert
+  # (when this pod dials a peer). Cluster mTLS = mutual auth.
+  usages:
+    - server auth
+    - client auth
+  dnsNames:
+    {{- range (default $defaultDnsNames .Values.clusterTls.dnsNames) }}
+    - {{ . | quote }}
+    {{- end }}
+  issuerRef:
+    name: {{ .Values.clusterTls.issuer.name }}
+    kind: {{ .Values.clusterTls.issuer.kind }}
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  duration: 720h    # 30 days
+  renewBefore: 240h # rotate at 10-day mark
+{{- end }}

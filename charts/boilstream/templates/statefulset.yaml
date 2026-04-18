@@ -1,0 +1,167 @@
+{{- $tlsSecret := default "boilstream-wildcard-tls" .Values.tls.existingSecret -}}
+{{- $superSecret := default "boilstream-superadmin" .Values.superadmin.existingSecret -}}
+{{- $clusterTlsSecret := default "boilstream-cluster-mtls" .Values.clusterTls.existingSecret -}}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: boilstream
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: boilstream
+    {{- include "boilstream.labels" . | nindent 4 }}
+spec:
+  serviceName: boilstream-headless
+  replicas: {{ .Values.replicas }}
+  podManagementPolicy: Parallel
+  selector:
+    # Selector intentionally narrow + immutable — adding standard labels in
+    # metadata.labels is fine, changing matchLabels would require teardown.
+    matchLabels: { app: boilstream }
+  template:
+    metadata:
+      labels:
+        app: boilstream
+        {{- include "boilstream.labels" . | nindent 8 }}
+    spec:
+      {{- if .Values.serviceAccount.create }}
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      {{- end }}
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds | default 120 }}
+      securityContext:
+        fsGroup: 999
+      initContainers:
+        - name: render-config
+          image: python:3.12-alpine
+          command: ["/bin/sh", "/tpl/overlay.sh"]
+          securityContext:
+            runAsUser: 0
+          env:
+            - name: POD_NAME
+              valueFrom: { fieldRef: { fieldPath: metadata.name } }
+            - name: POD_NAMESPACE
+              valueFrom: { fieldRef: { fieldPath: metadata.namespace } }
+            - name: SUPERADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $superSecret }}
+                  key: password
+            {{- if .Values.s3.existingCredsSecret }}
+            - name: S3_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.s3.existingCredsSecret }}
+                  key: access_key
+            - name: S3_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.s3.existingCredsSecret }}
+                  key: secret_key
+            {{- end }}
+            {{- if .Values.superadmin.existingMfaSecret }}
+            - name: SUPERADMIN_MFA_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.superadmin.existingMfaSecret }}
+                  key: mfa_secret
+            {{- end }}
+          volumeMounts:
+            - { name: config-tpl, mountPath: /tpl }
+            - { name: config,     mountPath: /cfg }
+            - { name: data,       mountPath: /data }
+      containers:
+        - name: boilstream
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["--config", "/cfg/config.yaml"]
+          ports:
+            - { name: pgwire,  containerPort: 5432 }
+            - { name: kafka,   containerPort: 9092 }
+            - { name: flight,  containerPort: 50050 }
+            - { name: auth,    containerPort: 8443 }
+            - { name: cluster, containerPort: 8444 }
+            - { name: metrics, containerPort: 8081 }
+          env:
+            - name: RUST_LOG
+              value: "info,boilstream=debug"
+            - name: HOME
+              value: "/home/boilstream"
+            # Extend the system trust bundle with the pod-local loopback cert so
+            # libcurl inside the DuckDB boilstream extension accepts the
+            # auth-server's SNI-returned loopback cert at https://127.0.0.1.
+            - name: SSL_CERT_FILE
+              value: "/cfg/trust-bundle.crt"
+            - name: CURL_CA_BUNDLE
+              value: "/cfg/trust-bundle.crt"
+            {{- if .Values.testMode.disableTurnstile }}
+            - name: DISABLE_TURNSTILE
+              value: "1"
+            {{- end }}
+          resources: {{ toYaml .Values.resources | nindent 12 }}
+          # Graceful drain: BoilStream's own SIGTERM handler flushes in-flight
+          # parquet to S3 and steps down leadership before exit. The preStop
+          # hook gives Envoy a beat to drain established connections to this
+          # pod before SIGTERM lands. Tune via values.preStopSleepSeconds.
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep {{ .Values.preStopSleepSeconds | default 5 }}"]
+          volumeMounts:
+            - { name: config, mountPath: /cfg }
+            - { name: data,   mountPath: /data }
+            - { name: pg-shm, mountPath: /dev/shm }
+            - { name: tls,    mountPath: /tls, readOnly: true }
+            # Override /etc/ssl/certs/ca-certificates.crt with the trust bundle
+            # that INCLUDES our loopback cert. DuckDB's httpfs extension hardcodes
+            # this path (CURLSSLOPT_NATIVE_CA + SelectCURLCertPath() in
+            # httpfs_curl_client.cpp) and ignores SSL_CERT_FILE / CURL_CA_BUNDLE
+            # env, so env-only overrides don't reach the extension's libcurl.
+            - name: config
+              mountPath: /etc/ssl/certs/ca-certificates.crt
+              subPath: trust-bundle.crt
+              readOnly: true
+            {{- if .Values.clusterTls.enabled }}
+            - { name: cluster-tls, mountPath: /cluster-tls, readOnly: true }
+            {{- end }}
+          readinessProbe:
+            tcpSocket: { port: 5432 }
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket: { port: 5432 }
+            initialDelaySeconds: 60
+            periodSeconds: 20
+      volumes:
+        - name: config-tpl
+          configMap: { name: boilstream-config }
+        - name: config
+          emptyDir: {}
+        - name: data
+          emptyDir: {}
+        - name: pg-shm
+          emptyDir: { medium: Memory, sizeLimit: 2Gi }
+        - name: tls
+          secret: { secretName: {{ $tlsSecret }} }
+        {{- if .Values.clusterTls.enabled }}
+        - name: cluster-tls
+          secret: { secretName: {{ $clusterTlsSecret }} }
+        {{- end }}

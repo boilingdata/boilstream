@@ -1,0 +1,32 @@
+apiVersion: v2
+name: boilstream
+description: |
+  BoilStream — high-performance streaming data ingestion (PGWire, Kafka,
+  Arrow Flight) with S3-coordinated cluster mode and DuckLake catalog
+  support. Each pod participates in S3-based leader election and serves
+  per-user catalogs; failed pods are recovered from S3 backups.
+type: application
+version: 0.3.0
+appVersion: "0.10.0"
+kubeVersion: ">=1.27.0"
+keywords:
+  - streaming
+  - pgwire
+  - kafka
+  - arrow-flight
+  - ducklake
+  - duckdb
+  - s3
+home: https://boilstream.com
+sources:
+  - https://github.com/boilingdata/boilstream
+maintainers:
+  - name: BoilStream
+    url: https://boilstream.com
+annotations:
+  # Documented prerequisites — operators must install these BEFORE the chart.
+  # Listed as annotations because Helm dependency support assumes a Chart we
+  # control; cert-manager and Envoy Gateway are independent installs.
+  boilstream.com/prereqs: |
+    cert-manager (>=1.13) — issues TLS Secrets via the configured ClusterIssuer
+    Envoy Gateway (>=1.2) — provides the GatewayClass referenced by gateway.className

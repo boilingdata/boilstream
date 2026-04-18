@@ -1,0 +1,182 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: boilstream-config
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "boilstream.labels" . | nindent 4 }}
+data:
+  # Base config (full default-config.yaml from the project). Init container patches
+  # the storage backend (→ RustFS), data paths (→ /data), and cluster_mode for K8s.
+  base-config.yaml: |
+{{ .Files.Get "files/base-config.yaml" | indent 4 }}
+
+  # Overlay applied by init container — replaces storage.backends, auth_server paths,
+  # cluster_mode.advertised_host / node_id_path.
+  overlay.sh: |
+    #!/bin/sh
+    set -e
+    POD_NAME="${POD_NAME:?}"
+    NS="${POD_NAMESPACE:-{{ .Values.namespace }}}"
+    cp /tpl/base-config.yaml /cfg/config.yaml
+
+    # Replace the default noop storage block with our S3 backend.
+    # S3 creds come from env vars (S3_ACCESS_KEY / S3_SECRET_KEY), themselves
+    # sourced from the Secret named in s3.existingCredsSecret. Fall back to
+    # the literals in values.s3.{accessKey,secretKey} for the local-dev path.
+    : "${S3_ACCESS_KEY:={{ .Values.s3.accessKey }}}"
+    : "${S3_SECRET_KEY:={{ .Values.s3.secretKey }}}"
+    export S3_ACCESS_KEY S3_SECRET_KEY
+    python3 - <<PY
+    import os, re
+    p = "/cfg/config.yaml"
+    with open(p) as f: c = f.read()
+    s3 = '''storage:
+      backends:
+        - name: "primary-s3"
+          backend_type: "s3"
+          enabled: true
+          primary: true
+          endpoint: "{{ .Values.s3.endpoint }}"
+          access_key: "''' + os.environ["S3_ACCESS_KEY"] + '''"
+          secret_key: "''' + os.environ["S3_SECRET_KEY"] + '''"
+          region: "{{ .Values.s3.region }}"
+          use_path_style: {{ .Values.s3.forcePathStyle }}
+          bucket: "{{ .Values.s3.bucket }}"
+          prefix: "{{ .Values.s3.prefix }}"
+          max_concurrent_uploads: 20
+          max_retries: 3
+          initial_backoff_ms: 100
+          max_retry_attempts: 3
+    '''
+    c = re.sub(r'storage:\n(  .*\n)+', s3, c, count=1)
+    # Rebase relative paths onto /data
+    for a, b in (
+        ("/tmp/boilstream/duckdb", "/data/duckdb"),
+        ("/tmp/boilstream/metadata.duckdb", "/data/metadata.duckdb"),
+        ("/tmp/boilstream/tenants", "/data/tenants"),
+        ("/tmp/boilstream/storage", "/data/storage"),
+        ('users_db_path: "data/users.duckdb"',      'users_db_path: "/data/users.duckdb"'),
+        ('encryption_key_path: "data/encryption.key"', 'encryption_key_path: "/data/encryption.key"'),
+        ('superadmin_password_path: "data/superadmin_password.txt"', 'superadmin_password_path: "/data/superadmin_password.txt"'),
+        ('superadmin_mfa_secret_path: "data/superadmin_mfa_secret.txt"', 'superadmin_mfa_secret_path: "/data/superadmin_mfa_secret.txt"'),
+        ('tls_cert: "./test-certs/localhost.crt"',  '# tls_cert: disabled for local k8s test'),
+        ('tls_key: "./test-certs/localhost.key"',   '# tls_key: disabled for local k8s test'),
+        ('port: 443      # HTTPS port for auth landing page', 'port: 8443     # HTTPS port for auth landing page (non-privileged)'),
+    ):
+        c = c.replace(a, b)
+
+    # Override cluster_mode (already present in default config) with K8s-aware values.
+    # __POD_NAME__ and __NS__ are replaced by the shell below after python writes the file.
+    cluster_block = '''cluster_mode:
+      enabled: true
+      node_id_path: "/data/node-id"
+      advertised_host: "__POD_NAME__.boilstream-headless.__NS__.svc.cluster.local"
+      internal_api_port: 8444
+      leader_heartbeat_interval_secs: 15
+      leader_stale_threshold_secs: 60
+      broker_heartbeat_interval_secs: 15
+      broker_stale_threshold_secs: 60
+    {{- if .Values.clusterTls.enabled }}
+      tls:
+        enabled: true
+        cert_path: "/cluster-tls/tls.crt"
+        key_path: "/cluster-tls/tls.key"
+        ca_cert_path: "/cluster-tls/ca.crt"
+        require_client_cert: true
+    {{- end }}
+    '''
+    c = re.sub(r'cluster_mode:\n(  .*\n)+', cluster_block, c, count=1)
+
+    # Enable TLS on PGWire, Kafka, and auth_server so SNI-based routing works through
+    # Envoy Gateway. Uses the wildcard cert mounted at /tls. (tls_cert_pem/tls_key_pem
+    # are string-valued, but the cert_path variant is the schema expected by the
+    # pgwire.tls and kafka.tls blocks.)
+    c = c.replace(
+        'pgwire:\n  enabled: true\n  port: 5432',
+        'pgwire:\n  enabled: true\n  port: 5432',
+    )
+    # Swap pgwire.tls.enabled false -> true + paths
+    c = re.sub(
+        r'pgwire:\n(.*?\n)  tls:\n    enabled: false',
+        lambda m: ('pgwire:\n' + m.group(1) +
+                   '  tls:\n    enabled: true\n    cert_path: "/tls/tls.crt"\n    key_path: "/tls/tls.key"'),
+        c, count=1, flags=re.DOTALL)
+    # Swap kafka.tls.enabled false -> true + paths
+    c = re.sub(
+        r'kafka:\n(.*?\n)  tls:\n    enabled: false',
+        lambda m: ('kafka:\n' + m.group(1) +
+                   '  tls:\n    enabled: true\n    cert_path: "/tls/tls.crt"\n    key_path: "/tls/tls.key"'),
+        c, count=1, flags=re.DOTALL)
+    # Point auth_server at the wildcard cert (replaces the commented-out test-certs paths)
+    # WebAuthn RP id/origin must match the public FQDN — browsers + passkey
+    # clients reject any mismatch. Pin both to values.domain so the chart is
+    # single-source-of-truth for the external hostname.
+    c = c.replace(
+        'webauthn_rp_id: "localhost"',
+        'webauthn_rp_id: "{{ .Values.domain }}"')
+    c = c.replace(
+        'webauthn_rp_origin: "https://localhost"',
+        'webauthn_rp_origin: "https://{{ .Values.domain }}"')
+
+    c = c.replace(
+        '# tls_cert: disabled for local k8s test',
+        'tls_cert: "/tls/tls.crt"')
+    c = c.replace(
+        '# tls_key: disabled for local k8s test',
+        'tls_key: "/tls/tls.key"')
+
+    with open(p, 'w') as f: f.write(c)
+    PY
+
+    # Substitute pod-specific placeholders in the final config
+    sed -i "s/__POD_NAME__/${POD_NAME}/g; s/__NS__/${NS}/g" /cfg/config.yaml
+
+    # Generate (once per pod) a self-signed loopback cert covering
+    # 127.0.0.1 / ::1 / localhost. Auth server serves this cert via SNI for
+    # in-pod TLS handshakes (e.g. PGWire → auth OPAQUE login driven by the
+    # DuckDB boilstream extension's libcurl, which strictly verifies certs
+    # and connects to 127.0.0.1:{auth_port}). The public cert mounted at
+    # /tls keeps serving external clients.
+    apk add --no-cache openssl >/dev/null 2>&1 || true
+    if [ ! -f /cfg/loopback.crt ] || [ ! -f /cfg/loopback.key ]; then
+      openssl req -x509 -newkey rsa:2048 \
+        -keyout /cfg/loopback.key -out /cfg/loopback.crt \
+        -days 3650 -nodes -subj "/CN=boilstream-loopback" \
+        -addext "subjectAltName=IP:127.0.0.1,IP:0:0:0:0:0:0:0:1,DNS:localhost" \
+        >/dev/null 2>&1
+    fi
+    # Trust bundle = system CAs + loopback cert. libcurl (via SSL_CERT_FILE /
+    # CURL_CA_BUNDLE) will validate the loopback cert against this bundle.
+    if [ -f /etc/ssl/certs/ca-certificates.crt ]; then
+      cat /etc/ssl/certs/ca-certificates.crt /cfg/loopback.crt > /cfg/trust-bundle.crt
+    else
+      cat /cfg/loopback.crt > /cfg/trust-bundle.crt
+    fi
+    # Splice loopback cert paths into auth_server: config block.
+    python3 - <<'PY'
+    p = "/cfg/config.yaml"
+    with open(p) as f: c = f.read()
+    if 'tls_loopback_cert' not in c:
+        c = c.replace(
+            'tls_cert: "/tls/tls.crt"',
+            'tls_cert: "/tls/tls.crt"\n  tls_loopback_cert: "/cfg/loopback.crt"\n  tls_loopback_key: "/cfg/loopback.key"'
+        )
+        with open(p, 'w') as f: f.write(c)
+    PY
+
+    # Superadmin password sourced from a Secret (see values.yaml: superadmin)
+    mkdir -p /data
+    if [ ! -f /data/superadmin_password.txt ]; then
+      printf '%s' "${SUPERADMIN_PASSWORD:?SUPERADMIN_PASSWORD env unset}" > /data/superadmin_password.txt
+    fi
+    chmod 600 /data/superadmin_password.txt
+    # Superadmin MFA secret (optional — only present when superadmin.existingMfaSecret is set).
+    # BoilStream reads this file at boot and enrolls it into the superadmin.mfa table;
+    # subsequent restarts are idempotent (enrollment only happens once per password).
+    if [ -n "${SUPERADMIN_MFA_SECRET:-}" ] && [ ! -f /data/superadmin_mfa_secret.txt ]; then
+      printf '%s' "$SUPERADMIN_MFA_SECRET" > /data/superadmin_mfa_secret.txt
+      chmod 600 /data/superadmin_mfa_secret.txt
+    fi
+    [ -f /data/node-id ] || printf '%s' "$POD_NAME" > /data/node-id
+    chown -R 999:999 /cfg /data
