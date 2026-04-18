@@ -37,8 +37,10 @@ Download, start, and connect with any Postgres-compatible BI tool. Data streams 
 See [GitHub releases](https://github.com/boilingdata/boilstream/releases) for the latest version.
 
 ```bash
-# Download (linux-x64, linux-aarch64, darwin-aarch64)
-# Replace {VERSION} with the latest release (e.g. 0.10.0)
+# Download — pick your platform from:
+#   darwin-aarch64 (Apple Silicon), darwin-x64 (Intel Mac),
+#   linux-aarch64 (Linux ARM64), linux-x64 (Linux x86_64), windows-x64 (Windows)
+# Replace {VERSION} with the latest release (see GitHub releases above, e.g. 0.10.0)
 curl -L -o boilstream https://www.boilstream.com/binaries/darwin-aarch64/boilstream-{VERSION}
 curl -L -o boilstream-admin https://www.boilstream.com/binaries/darwin-aarch64/boilstream-admin-{VERSION}
 chmod +x boilstream boilstream-admin
