@@ -148,6 +148,24 @@ data:
         rp_origin_line + '\n  webauthn_additional_rp_origins:' + yaml_list,
     )
 
+    # Enable users_backup_* so /data/users.duckdb is snapshotted to S3 on
+    # a timer and restored on pod start. /data is an emptyDir in this
+    # chart, so without this every pod replacement wipes the user table.
+    # The backend name must match a storage backend defined above
+    # (see primary-s3 in the storage.backends block).
+    c = c.replace(
+        '# users_backup_backend: "noop-primary"    # Name of storage backend to use for backups',
+        'users_backup_backend: "primary-s3"    # Snapshot users.duckdb to this backend',
+    )
+    c = c.replace(
+        '# users_backup_interval_seconds: 60  # Minimum seconds between backups (default: 60)',
+        'users_backup_interval_seconds: 60',
+    )
+    c = c.replace(
+        '# users_backup_path: "auth/users.duckdb"  # Path in backend for backup file',
+        'users_backup_path: "auth/users.duckdb"',
+    )
+
     c = c.replace(
         '# tls_cert: disabled for local k8s test',
         'tls_cert: "/tls/tls.crt"')
