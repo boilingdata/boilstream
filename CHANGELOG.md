@@ -5,6 +5,17 @@ All notable changes to BoilStream will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.2] - 2026-04-19
+
+### Fixes
+
+- **WebAuthn passkey enrollment in K8s cluster mode**: Broker→leader redirects land the browser on a per-pod subdomain (`boilstream-N.<domain>`) different from the configured `webauthn_rp_origin`, and webauthn-rs's strict origin check rejected the ceremony with `HTTP 400 – Registration failed - The clients relying party origin does not match our servers information`.
+
+### Features
+
+- **`webauthn_additional_rp_origins` server config**: Optional list of extra origins accepted during WebAuthn registration/authentication. `rp_id` stays as the base domain so credentials roam across all pods; `rp_origin` is the canonical primary URL; the new list covers the redirect-target subdomains.
+- **Helm chart**: ConfigMap overlay auto-renders both `:443` and `:8443` variants of every per-pod subdomain (`boilstream-0.<domain>`, …) into `webauthn_additional_rp_origins`. Chart version **0.3.5**.
+
 ## [0.10.1] - 2026-04-19
 
 ### Fixes

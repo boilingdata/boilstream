@@ -128,6 +128,26 @@ data:
         'webauthn_rp_origin: "https://localhost"',
         'webauthn_rp_origin: "https://{{ .Values.domain }}"')
 
+    # Broker→leader redirects land the browser on a per-pod subdomain
+    # (boilstream-N.{{ .Values.domain }}). WebAuthn ceremonies started on
+    # that subdomain need each per-pod origin in the allowed list, since
+    # webauthn-rs does an exact origin match. rp_id remains the base domain
+    # so credentials work across all pods. Include both :443 (browser) and
+    # :8443 (direct CLI / 307-from-:443 landing) variants.
+    extra_origins = [
+{{- range $i, $_ := until (int .Values.replicas) }}
+        'https://boilstream-{{ $i }}.{{ $.Values.domain }}',
+        'https://boilstream-{{ $i }}.{{ $.Values.domain }}:8443',
+{{- end }}
+    ]
+    # Append a webauthn_additional_rp_origins list right after rp_origin.
+    rp_origin_line = 'webauthn_rp_origin: "https://{{ .Values.domain }}"'
+    yaml_list = ''.join(f'\n    - "{o}"' for o in extra_origins)
+    c = c.replace(
+        rp_origin_line,
+        rp_origin_line + '\n  webauthn_additional_rp_origins:' + yaml_list,
+    )
+
     c = c.replace(
         '# tls_cert: disabled for local k8s test',
         'tls_cert: "/tls/tls.crt"')
