@@ -46,6 +46,11 @@ spec:
         kinds: [ { kind: TLSRoute } ]
 ---
 {{- $vals := . -}}
+{{- /*
+  Per-pod SNI TLSRoutes — kept for debugging and for clients that want to
+  pin a specific pod (e.g. long-lived Kafka consumers that care about
+  session stickiness across reconnects).
+*/}}
 {{- range $i, $_ := until (int .Values.replicas) }}
 {{- range $listener := list "pgwire" "kafka" "flight" "auth" }}
 {{- $port := index (dict "pgwire" 5432 "kafka" 9092 "flight" 50050 "auth" 8443) $listener }}
@@ -65,6 +70,40 @@ spec:
           port: {{ $port }}
 ---
 {{- end }}
+{{- end }}
+
+{{- /*
+  Bare-hostname TLSRoutes — the default entry point users hit.
+  SNI matches {{ .Values.domain }} and Envoy round-robins new TCP
+  connections across all per-pod ClusterIP backends.
+
+  Safe because every pod serves the same *.{{ .Values.domain }} wildcard
+  cert, and boilstream's cluster mode lets any pod handle data-plane ops
+  directly while brokers transparently forward catalog mutations to the
+  leader over the :8444 internal API. PGWire sessions are TCP-sticky so
+  prepared statements / transactions stay on the pod you landed on; a
+  reconnect simply picks a new pod.
+*/}}
+{{- range $listener := list "pgwire" "kafka" "flight" "auth" }}
+{{- $port := index (dict "pgwire" 5432 "kafka" 9092 "flight" 50050 "auth" 8443) $listener }}
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: TLSRoute
+metadata:
+  name: boilstream-any-{{ $listener }}
+  namespace: {{ $vals.Values.namespace }}
+spec:
+  parentRefs:
+    - { name: boilstream, sectionName: {{ $listener }} }
+  hostnames:
+    - {{ $vals.Values.domain }}
+  rules:
+    - backendRefs:
+        {{- range $i, $_ := until (int $vals.Values.replicas) }}
+        - name: boilstream-{{ $i }}
+          port: {{ $port }}
+          weight: 1
+        {{- end }}
+---
 {{- end }}
 {{- end }}
 
