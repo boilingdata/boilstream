@@ -45,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Helm chart de-localized**: Example charts no longer embed localhost certificates or hard-coded dev hostnames — production deploys use real FQDNs end-to-end
 - **boilstream-admin wrapper for K8s**: New `scripts/boilstream-admin-k8s.sh` reads CA, superadmin password, and MFA secret live from Kubernetes `Secret`s; computes TOTP locally and execs the admin CLI against the in-cluster deployment
 - **`testMode.disableTurnstile` chart value**: Lets CI/test clusters skip the Turnstile CAPTCHA on `/auth/email/signup` without rebuilding the image
+- **Portable ARM64 Linux variant (`-generic` / `aarch64-generic-linux-0.10.0`)**: The default `aarch64-linux-0.10.0` build is AWS Graviton-tuned and uses extensions not present on Ampere Altra / Oracle Ampere / Apple Silicon (when run in a Linux Docker container); the new `-generic` variant is built against the ARMv8-a baseline so it runs everywhere. Both are published side-by-side on S3 and Docker Hub.
 
 ## [0.9.0] - 2026-04-08
 

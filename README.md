@@ -38,19 +38,31 @@ See [GitHub releases](https://github.com/boilingdata/boilstream/releases) for th
 
 ```bash
 # Download — pick your platform from:
-#   darwin-aarch64 (Apple Silicon), darwin-x64 (Intel Mac),
-#   linux-aarch64 (Linux ARM64), linux-x64 (Linux x86_64), windows-x64 (Windows)
+#   darwin-aarch64   Apple Silicon Mac
+#   darwin-x64       Intel Mac
+#   linux-aarch64    Linux ARM64 — AWS Graviton-tuned (fastest on AWS EC2 Graviton 2/3/4)
+#   linux-x64        Linux x86_64
+#   windows-x64      Windows
 # Replace {VERSION} with the latest release (see GitHub releases above, e.g. 0.10.0)
 curl -L -o boilstream https://www.boilstream.com/binaries/darwin-aarch64/boilstream-{VERSION}
 curl -L -o boilstream-admin https://www.boilstream.com/binaries/darwin-aarch64/boilstream-admin-{VERSION}
 chmod +x boilstream boilstream-admin
 
+# Non-AWS ARM64 (Hetzner, Oracle Ampere, Apple Silicon inside a Linux Docker container):
+# the default linux-aarch64 build uses AWS Graviton extensions and will SIGILL on
+# Ampere Altra and similar. Use the -generic variant instead:
+#   curl -L -o boilstream       https://www.boilstream.com/binaries/linux-aarch64/boilstream-{VERSION}-generic
+#   curl -L -o boilstream-admin https://www.boilstream.com/binaries/linux-aarch64/boilstream-admin-{VERSION}-generic
+
 SERVER_IP_ADDRESS=1.2.3.4 ./boilstream
 
-# Docker
+# Docker — AWS Graviton or x86_64:
 docker run -v ./config.yaml:/app/config.yaml \
    -p 443:443 -p 5432:5432 -p 50051:50051 -p 50250:50250 \
    -e SERVER_IP_ADDRESS=1.2.3.4 boilinginsights/boilstream:aarch64-linux-{VERSION}
+
+# Docker on non-AWS ARM64 (Hetzner, Oracle Ampere, Apple Silicon):
+#   boilinginsights/boilstream:aarch64-generic-linux-{VERSION}
 ```
 
 > _Use the accompanying `docker-compose.yml` to start Grafana and MinIO_
