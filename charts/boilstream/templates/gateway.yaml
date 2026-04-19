@@ -44,6 +44,17 @@ spec:
       allowedRoutes:
         namespaces: { from: Same }
         kinds: [ { kind: TLSRoute } ]
+    # Standard HTTPS 443 — so browsers hitting https://<domain>/ reach
+    # the web auth console without typing :8443. TLS passthrough routes
+    # to the same per-pod :8443 auth backends (since the pod containers
+    # bind :8443 unprivileged; we route :443 → :8443 at the LB).
+    - name: auth-https
+      protocol: TLS
+      port: 443
+      tls: { mode: Passthrough }
+      allowedRoutes:
+        namespaces: { from: Same }
+        kinds: [ { kind: TLSRoute } ]
 ---
 {{- $vals := . -}}
 {{- /*
@@ -52,8 +63,8 @@ spec:
   session stickiness across reconnects).
 */}}
 {{- range $i, $_ := until (int .Values.replicas) }}
-{{- range $listener := list "pgwire" "kafka" "flight" "auth" }}
-{{- $port := index (dict "pgwire" 5432 "kafka" 9092 "flight" 50050 "auth" 8443) $listener }}
+{{- range $listener := list "pgwire" "kafka" "flight" "auth" "auth-https" }}
+{{- $port := index (dict "pgwire" 5432 "kafka" 9092 "flight" 50050 "auth" 8443 "auth-https" 8443) $listener }}
 apiVersion: gateway.networking.k8s.io/v1alpha2
 kind: TLSRoute
 metadata:
@@ -84,8 +95,8 @@ spec:
   prepared statements / transactions stay on the pod you landed on; a
   reconnect simply picks a new pod.
 */}}
-{{- range $listener := list "pgwire" "kafka" "flight" "auth" }}
-{{- $port := index (dict "pgwire" 5432 "kafka" 9092 "flight" 50050 "auth" 8443) $listener }}
+{{- range $listener := list "pgwire" "kafka" "flight" "auth" "auth-https" }}
+{{- $port := index (dict "pgwire" 5432 "kafka" 9092 "flight" 50050 "auth" 8443 "auth-https" 8443) $listener }}
 apiVersion: gateway.networking.k8s.io/v1alpha2
 kind: TLSRoute
 metadata:
