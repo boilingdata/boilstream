@@ -5,6 +5,17 @@ All notable changes to BoilStream will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.1] - 2026-04-19
+
+### Fixes
+
+- **Cluster admin redirects + responses use public hostname**: Broker→leader redirects from the auth server's leader-check middleware, plus the `host` fields in `LeaderInfoResponse` / `BrokerInfoResponse`, now advertise an externally-reachable hostname when the new `cluster_mode.public_host` is set. Previously these paths only knew about `advertised_host` (in Kubernetes: the pod's internal headless-Service DNS, unreachable from outside the cluster), so `boilstream-admin` against a cluster's public endpoint could be redirected to a `*.svc.cluster.local` target or receive an internal hostname in the cluster status response.
+
+### Features
+
+- **`cluster_mode.public_host` config**: Optional per-node public hostname used for all client-facing paths — admin redirects, `boilstream-admin` cluster status responses, and future extensions for secret / bootstrap-URL vending. `advertised_host` remains the inside-the-cluster DNS name for pod-to-pod gRPC on `internal_api_port`, unchanged. Backward-compatible: missing `public_host` in S3 state (`leader.json`, `brokers/*.json`) deserialises cleanly and falls back to `host`.
+- **Helm chart**: `configmap.yaml` overlay auto-renders `public_host = {POD_NAME}.{values.domain}` into each pod's runtime config, kept in sync with the per-pod `TLSRoute` resources (`boilstream-N.<domain>`). Chart version **0.3.3**.
+
 ## [0.10.0] - 2026-04-18
 
 ### Features
