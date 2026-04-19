@@ -68,10 +68,19 @@ data:
 
     # Override cluster_mode (already present in default config) with K8s-aware values.
     # __POD_NAME__ and __NS__ are replaced by the shell below after python writes the file.
+    #
+    # advertised_host = inside-the-cluster DNS for pod-to-pod gRPC on internal_api_port.
+    # public_host     = external per-pod SNI hostname served by Envoy + the public
+    #                   wildcard cert. Used for admin redirects, secrets vended
+    #                   to remote DuckDB clients, and bootstrap URLs so those
+    #                   clients can connect back to the correct pod from outside
+    #                   the cluster. Kept in sync with the per-pod TLSRoute in
+    #                   gateway.yaml: boilstream-N.{{ .Values.domain }}
     cluster_block = '''cluster_mode:
       enabled: true
       node_id_path: "/data/node-id"
       advertised_host: "__POD_NAME__.boilstream-headless.__NS__.svc.cluster.local"
+      public_host: "__POD_NAME__.{{ .Values.domain }}"
       internal_api_port: 8444
       leader_heartbeat_interval_secs: 15
       leader_stale_threshold_secs: 60
