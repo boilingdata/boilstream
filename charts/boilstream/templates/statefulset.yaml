@@ -13,6 +13,10 @@ spec:
   serviceName: boilstream-headless
   replicas: {{ .Values.replicas }}
   podManagementPolicy: Parallel
+  {{- with .Values.updateStrategy }}
+  updateStrategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   selector:
     # Selector intentionally narrow + immutable — adding standard labels in
     # metadata.labels is fine, changing matchLabels would require teardown.

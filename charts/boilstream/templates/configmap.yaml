@@ -163,8 +163,12 @@ data:
     )
     c = c.replace(
         '# users_backup_path: "auth/users.duckdb"  # Path in backend for backup file',
-        'users_backup_path: "auth/users.duckdb"',
+        'users_backup_path: "auth/users.snapshot.duckdb.gz"',
     )
+    # superadmin backup: base-config.yaml has no explicit directives, so main.rs
+    # falls back to users_backup_backend / interval and defaults path to
+    # "backups/superadmin/superadmin.snapshot.duckdb.gz" (different S3 key from
+    # users, no collision).
 
     c = c.replace(
         '# tls_cert: disabled for local k8s test',

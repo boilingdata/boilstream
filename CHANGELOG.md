@@ -5,6 +5,31 @@ All notable changes to BoilStream will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.5] - 2026-04-20
+
+### Fixes
+
+- **Auth-database backup/restore in K8s cluster mode**: The pre-0.10.5 flow used `EXPORT DATABASE` / `IMPORT DATABASE` against an already-attached users / superadmin DuckDB database. On every pod restart after 0.10.3 enabled `/data`-emptyDir backup-to-S3, `IMPORT DATABASE` collided on pre-created objects (e.g. `duckdb_secrets_id_seq`) and the restore retried forever, so the emptyDir rollover effectively wiped the user table each time a pod was rescheduled. Replaced with a byte-level file snapshot (CHECKPOINT + `fs::copy` of the on-disk `.duckdb` file, gzip, S3 PUT) that the server atomically drops into place BEFORE the DuckDB ATTACH on the next boot. No schema replay, no sequence collisions, no retry loops.
+- **Leader-failover correctness in 2+ pod clusters**: On leader failover, the newly-promoted worker's local auth DB was stale (the previous leader had been writing locally since this worker's last boot-time S3 restore) and the promotion path kept serving those stale reads as the new leader. 0.10.5 purges the local `/data/users.duckdb` + `data/superadmin.duckdb` and calls `std::process::exit(1)` on worker→leader transition; Kubernetes restarts the container and the normal boot path pulls the latest S3 snapshot before ATTACH + re-enters election with authoritative data.
+- **Non-leader shutdown no longer clobbers S3**: `perform_shutdown_backup` and `perform_backup_with_retry` now check `is_leader()` before uploading. Previously a stale worker receiving SIGTERM would upload its local (potentially older) snapshot and overwrite the authoritative blob written by the live leader. Non-leaders on shutdown now log `not the cluster leader — worker state is not authoritative and must not overwrite the leader's S3 snapshot` and exit clean.
+
+### Features
+
+- **Helm chart — optional `updateStrategy.rollingUpdate.partition`** on the StatefulSet template, for explicit canary rollouts (update pod-1 first, verify, then lift the partition for pod-0).
+- **Helm chart — `users_backup_path`** defaults to `auth/users.snapshot.duckdb.gz` (new format); `superadmin_backup_path` falls through to `backups/superadmin/superadmin.snapshot.duckdb.gz` via server-side defaults so no explicit config is needed.
+- Chart version **0.3.9** / appVersion **0.10.5**.
+
+### Verified on the Hetzner/CloudFleet cluster (`de29ffdf-…`)
+
+- 6 test users + superadmin persist across both `pod-0→pod-1` and `pod-1→pod-0` leader deletions.
+- S3 snapshot stays consistent at 28,066,348 bytes across both pods post-failover.
+- Promoted pod logs show the expected `"💥 Promoted from worker to leader — purging local auth DBs..."` → `Deleted local database: /data/users.duckdb` → `✅ Restored users database from S3 snapshot` sequence on the container restart.
+
+### Upgrade notes
+
+- Any `auth/users.duckdb` (old `tar.gz` format from 0.10.3) left in S3 is orphaned by this release — safe to delete. The new backup writes to a fresh key, so there is no format-upgrade migration on the bucket; the old blob just becomes unreferenced.
+- Rolling 0.10.3 → 0.10.5 through 0.10.4 is **not** supported: 0.10.4 was only ever an iterative Docker-tag build (never git-tagged) and had known promotion-staleness bugs in the `b1`/`b2` sub-builds. Roll directly from 0.10.3 to 0.10.5.
+
 ## [0.10.2] - 2026-04-19
 
 ### Fixes
