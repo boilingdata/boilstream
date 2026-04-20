@@ -5,6 +5,21 @@ All notable changes to BoilStream will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.6] - 2026-04-20
+
+### Fixes
+
+- **SIGILL on ARM64 hosts without SHA3 / SHA512 hardware** (Ampere Altra / Neoverse N1: Hetzner cax*, Oracle Ampere A1, AWS Graviton 2): the `aarch64-generic-linux-0.10.5` binary shipped `sha512h`, `sha512su0`, `sha512su1`, `bcax`, `eor3`, `rax1`, `xar` instructions. `/proc/cpuinfo` on these CPUs correctly reports `aes pmull sha1 sha2 crc32 asimddp` without `sha3 sha512`, so every code path that hit those insns crashed with exit code 132 (SIGILL). Root cause: the previous "-generic" artefact was built on Apple Silicon under OrbStack, and that VM exposes `sha3`+`sha512` in `/proc/cpuinfo`; `aws-lc-sys`, `openssl-sys`, `nettle-sys` each autodetect CPU features at build time and compile in hardware-accelerated paths when the *build host* supports them, regardless of `RUSTFLAGS` / `CFLAGS` overrides.
+  - **Fix**: `aarch64-generic-linux-0.10.6` is now built on AWS EC2 `c6gd.8xlarge` (Graviton 2 = Neoverse N1) — same microarchitecture as Ampere Altra — so the build host itself lacks SHA3/SHA512 and the compiled artefact never contains those insns. Verified with `aarch64-linux-gnu-objdump -d | grep -E 'sha512h|bcax|eor3|rax1|xar'` → empty.
+  - **Impact**: every OPAQUE-heavy auth path (`/auth/email/signup`, `/auth/email/login`, SCIM provisioning, TOTP enrollment) reliably crashed the pod on Ampere hosts. Kubelet restarted the container so the workload kept making forward progress, but ~every successful request cost a restart cycle. `0.10.6` eliminates the crash entirely.
+- **Hetzner / CloudFleet clusters running `0.10.5` MUST upgrade to `0.10.6`** to avoid the SIGILL. AWS Graviton 2+ customers using the `aarch64-generic-linux` image should also upgrade (they'd hit the same crash on Graviton 2 but are unaffected on Graviton 3+). The `aarch64-linux-0.10.5` (Graviton-tuned, separate artefact) is NOT affected — it's built on c7gd.8xlarge and intentionally targets Neoverse V1+ features.
+
+### Notes
+
+- `aarch64-linux-0.10.6` (Graviton-tuned) is still built on `c7gd.8xlarge` (Graviton 3 = Neoverse V1) and keeps SHA3+SHA512 hardware paths — users on AWS Graviton 3/4 should use that variant for the perf.
+- `linux-x64-0.10.6` and `darwin-aarch64-0.10.6` are unaffected (build-host matched release target) but bumped for consistency.
+- Chart version stays **0.3.11** (no chart-logic change, appVersion bumped).
+
 ## Chart [0.3.10] - 2026-04-20
 
 ### Fixes
