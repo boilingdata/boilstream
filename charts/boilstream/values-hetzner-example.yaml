@@ -46,14 +46,28 @@ resources:
 nodeSelector:
   boilstream.com/nodepool: arm64-hel
 
-# Hard anti-affinity → exactly one pod per node. With 2 replicas, this forces
-# Karpenter to provision 2 nodes.
+# Soft anti-affinity — pods prefer separate nodes, but tolerate co-location
+# during capacity churn. Hard `requiredDuringScheduling` deadlocks on
+# CloudFleet: Karpenter's aggressive WhenEmptyOrUnderutilized consolidation
+# taints nodes on any workload hiccup → pods can't land on tainted nodes →
+# Karpenter tries to provision replacements → CFKE's locked NodePool CPU
+# cap rejects → phantom NodeClaims accumulate and the cluster wedges.
 affinity:
   podAntiAffinity:
-    requiredDuringSchedulingIgnoredDuringExecution:
-      - labelSelector:
-          matchLabels: { app: boilstream }
-        topologyKey: kubernetes.io/hostname
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchLabels: { app: boilstream }
+          topologyKey: kubernetes.io/hostname
+
+# Tolerate Karpenter's disruption taint so pods can temporarily schedule on
+# nodes marked for drain. Without this, every consolidation cycle locks
+# pods out of the nodes Karpenter has decided to shrink.
+tolerations:
+  - key: karpenter.sh/disrupted
+    operator: Exists
+    effect: NoSchedule
 
 # Use existing Secret for the superadmin password + MFA secret. Both are managed
 # out of band (kubectl create secret …) so they're never in Helm values output.

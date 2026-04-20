@@ -5,6 +5,12 @@ All notable changes to BoilStream will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Chart [0.3.10] - 2026-04-20
+
+### Fixes
+
+- **3-way Karpenter/CloudFleet deadlock on `values-hetzner-example.yaml`**: During the 0.10.5 rollout the Hetzner/CloudFleet cluster repeatedly wedged with pods stuck `Pending` and phantom `Unknown` NodeClaims piling up. Root cause: the example's **hard pod anti-affinity** (`requiredDuringSchedulingIgnoredDuringExecution`) combined with Karpenter's aggressive `WhenEmptyOrUnderutilized` consolidation (`consolidateAfter: 1m`) meant every scale or pod-kill event tainted existing nodes `karpenter.sh/disrupted:NoSchedule` to drain them, while CFKE's locked `NodePool.limits.cpu: "16"` blocked Karpenter from provisioning replacements. Result: no node could accept the pods (all tainted) and no new node could be launched (over cap). Fix ships two values-hetzner-example defaults: `anti-affinity.preferredDuringSchedulingIgnoredDuringExecution` (pods still prefer distinct nodes but may co-locate during churn), and a `karpenter.sh/disrupted:NoSchedule` toleration so pods can temporarily schedule on draining nodes. App code (`0.10.5`) unchanged.
+
 ## [0.10.5] - 2026-04-20
 
 ### Fixes
