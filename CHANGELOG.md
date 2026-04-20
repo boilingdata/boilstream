@@ -16,9 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Notes
 
-- `aarch64-linux-0.10.6` (Graviton-tuned) is still built on `c7gd.8xlarge` (Graviton 3 = Neoverse V1) and keeps SHA3+SHA512 hardware paths — users on AWS Graviton 3/4 should use that variant for the perf.
-- `linux-x64-0.10.6` and `darwin-aarch64-0.10.6` are unaffected (build-host matched release target) but bumped for consistency.
-- Chart version stays **0.3.11** (no chart-logic change, appVersion bumped).
+- **Only `aarch64-generic-linux` is rebuilt at 0.10.6.** The other platforms (`darwin-aarch64`, `linux-aarch64` Graviton-tuned, `linux-x64`) never had the SIGILL — their build hosts matched their release targets — so they stay at `0.10.5`. No action needed for users on those variants.
+- `aarch64-linux-0.10.5` (AWS Graviton-tuned) is still built on `c7gd.8xlarge` (Graviton 3 = Neoverse V1) and keeps SHA3+SHA512 hardware paths — AWS Graviton 3/4 users should use that variant for the perf.
+- Chart version **0.3.11** tracks appVersion `0.10.6`.
 
 ## Chart [0.3.10] - 2026-04-20
 
