@@ -5,6 +5,22 @@ All notable changes to BoilStream will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.7] - 2026-04-20
+
+### Features
+
+- **Horizontal PGWire scaling with leader-exclusive auth state**: non-leader pods now complete SCRAM-SHA-256 auth locally by fetching the password hash from the leader over the internal mTLS cluster API (:8444), rather than requiring cross-pod replication of `users.duckdb`. The `temp_credentials` table stays leader-exclusive — no new per-pod cred sync, no stale replicas, no extra storage — while every pod can accept PGWire connections and run the subsequent query session. One short gRPC round-trip at connect time on workers; queries themselves run locally.
+  - **Why it matters**: `app.boilstream.com:5432` as a bare load-balanced entry point now just works. Clients don't need to parse the leader hostname out of a 307 redirect or pin to a pod-specific SNI; any pod accepts the connection and the auth path converges to a consistent hash on the leader. Fixes the ~50% auth-failure-rate observation in 2-pod Hetzner deploys under the `boilstream-any-*` TLSRoutes.
+  - **How it works**: `OAuthCredentialStore::get_scram_hash()` now consults the cluster coordinator; on non-leader pods it opens a tonic mTLS channel to `{leader.host}:{internal_port}` and calls the new `ClusterSync.GetScramHash(username)` RPC. Leader answers from its local DuckDB `temp_credentials`. The RPC reuses the existing `ClusterTlsConfig` (cert_path / key_path / ca_cert_path) so no new cert material is required.
+  - **New proto**: `GetScramHash(GetScramHashRequest) returns (GetScramHashResponse)` on the `ClusterSync` service. Request is a single `username` string; response carries the SCRAM-SHA-256 hash plus a `found` flag to disambiguate not-found from genuinely-empty. Backwards compatible — workers connecting to a pre-0.10.7 leader just fall back to their local (empty) lookup and surface the standard "Invalid username or password" error.
+- **FlightRPC ingestion and FlightSQL consumer servers now serve TLS**: the top-level `tls.disabled: false` block is now honored end-to-end. All three Flight servers (ingestion Thread 1 on `:50051`, admin, consumer FlightSQL on `:50250`) present the configured identity; the Envoy Gateway `TLSRoute` passthrough works through to the backend. Previously the Hetzner chart's `flight` listener targeted `:50050` (Thread 0) while clients and docs referenced `:50051` (Thread 1, the canonical entry point) — that's now aligned on `50051` in the chart, with a new `flightsql` listener for `50250`.
+
+### Notes
+
+- **PGWire clients should use `sslnegotiation=direct` (libpq 17+)**. BoilStream's PGWire SSL handshake runs via ALPN and pure-TLS (not the PG-classic plaintext `SSLRequest` → `S` negotiation); direct-TLS is what Envoy passes through. Older libpq (<17) + `sslmode=require` without direct negotiation will fail with "received direct SSL connection request without ALPN protocol negotiation extension".
+- Chart version **0.3.13** tracks appVersion `0.10.7`. Contains the new `BackendTrafficPolicy` CRDs for source-IP consistent-hash LB on the `boilstream-any-*` TLSRoutes, so clients behind different source IPs stay on the same pod across auth + data-plane listeners (the SCRAM fallback above means this is no longer a correctness requirement, but it keeps per-connection latency predictable by avoiding the leader round-trip when the pod is already the leader).
+- Flight TLS gating is driven by the `TLS_CERT_PATH` / `TLS_KEY_PATH` environment variables on non-free-tier builds (see `src/tls.rs::load_tls_config_from_env`). The Hetzner chart's StatefulSet now exports these to `/tls/tls.crt` and `/tls/tls.key` — the same wildcard cert that pgwire and kafka already mount. No new Secrets required.
+
 ## [0.10.6] - 2026-04-20
 
 ### Fixes
