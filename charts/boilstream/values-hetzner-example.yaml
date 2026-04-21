@@ -2,7 +2,7 @@
 #
 #   helm install boilstream ./charts/boilstream \
 #     -f charts/boilstream/values-hetzner-example.yaml \
-#     --set image.tag=aarch64-generic-linux-0.10.5 \
+#     --set image.tag=0.10.0-pro-1.5.2 \
 #     --set superadmin.existingSecret=boilstream-superadmin
 
 replicas: 2                              # 2 nodes, 1 pod each
@@ -11,7 +11,7 @@ namespaceCreate: true
 
 image:
   repository: <your-cfcr-tenant>.europe.registry.cloudfleet.dev/boilstream
-  tag: aarch64-generic-linux-0.10.5
+  tag: 0.10.0-pro-1.5.2
   pullPolicy: IfNotPresent
   pullSecrets: []                        # CFCR auth comes via the cluster's image-pull integration
 
@@ -47,11 +47,13 @@ nodeSelector:
   boilstream.com/nodepool: arm64-hel
 
 # Soft anti-affinity — pods prefer separate nodes, but tolerate co-location
-# during capacity churn. Hard `requiredDuringScheduling` deadlocks on
-# CloudFleet: Karpenter's aggressive WhenEmptyOrUnderutilized consolidation
-# taints nodes on any workload hiccup → pods can't land on tainted nodes →
-# Karpenter tries to provision replacements → CFKE's locked NodePool CPU
-# cap rejects → phantom NodeClaims accumulate and the cluster wedges.
+# during capacity churn. Hard `requiredDuringScheduling` caused a 3-way
+# deadlock on CloudFleet: Karpenter's aggressive WhenEmptyOrUnderutilized
+# consolidation taints nodes on any workload hiccup → pods can't land on
+# tainted nodes → Karpenter tries to provision replacements → CFKE's locked
+# NodePool CPU cap rejects → phantom NodeClaims accumulate and the cluster
+# wedges. Preferring separate nodes (vs requiring) lets both pods co-locate
+# on a single cax21 during churn while Karpenter's consolidation completes.
 affinity:
   podAntiAffinity:
     preferredDuringSchedulingIgnoredDuringExecution:
@@ -62,8 +64,10 @@ affinity:
           topologyKey: kubernetes.io/hostname
 
 # Tolerate Karpenter's disruption taint so pods can temporarily schedule on
-# nodes marked for drain. Without this, every consolidation cycle locks
-# pods out of the nodes Karpenter has decided to shrink.
+# nodes marked for drain. Without this, every consolidation cycle locks out
+# new pods from every node Karpenter has decided to shrink, which (combined
+# with a capped NodePool) creates the wedge above. Disrupting nodes still
+# get drained and replaced — the toleration just lets pods ride the drain.
 tolerations:
   - key: karpenter.sh/disrupted
     operator: Exists

@@ -117,6 +117,15 @@ data:
         lambda m: ('kafka:\n' + m.group(1) +
                    '  tls:\n    enabled: true\n    cert_path: "/tls/tls.crt"\n    key_path: "/tls/tls.key"'),
         c, count=1, flags=re.DOTALL)
+    # Enable the top-level tls block. This gates FlightRPC gRPC TLS across all
+    # three Flight servers (data ingestion :50050, admin, consumer :50250).
+    # Required for Envoy Gateway TLS passthrough on the flight listener — without
+    # it, clients reach a plaintext gRPC backend and TLS handshake fails with EOF.
+    # Uses the same wildcard cert as pgwire/kafka, mounted at /tls.
+    c = c.replace(
+        'tls:\n  disabled: true  # Disabled for development',
+        'tls:\n  disabled: false\n  cert_path: "/tls/tls.crt"\n  key_path: "/tls/tls.key"',
+    )
     # Point auth_server at the wildcard cert (replaces the commented-out test-certs paths)
     # WebAuthn RP id/origin must match the public FQDN — browsers + passkey
     # clients reject any mismatch. Pin both to values.domain so the chart is

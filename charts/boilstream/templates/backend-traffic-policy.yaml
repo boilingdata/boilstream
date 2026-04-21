@@ -1,0 +1,43 @@
+{{- if .Values.gateway.enabled }}
+{{- /*
+  Source-IP consistent-hash load balancing on the bare-hostname
+  ({{ .Values.domain }}) TLSRoutes.
+
+  Why: PGWire/Kafka/Flight/FlightSQL credentials vended via /auth/api/credentials
+  are leader-pinned (the /auth/api/credentials endpoint 307-redirects to the
+  leader, and users.duckdb lives on the leader). Non-leader workers fetch the
+  SCRAM hash from the leader over the :8444 internal API on connect; the rest
+  of the session stays on the worker for horizontal scale.
+
+  For that worker-side SCRAM fallback to find the same (user, session) tuple
+  that the client vended against, the client must consistently land on the
+  same pod across /auth + data-plane listeners. Consistent-hash on source IP
+  achieves that without replicating cred state across pods.
+
+  Caveat — source IP behind a LB:
+    Envoy sees the LoadBalancer Service's client IP. Real-client stickiness
+    requires PROXY protocol end-to-end (`proxyProtocol` on BackendTrafficPolicy
+    + a LB that speaks it, e.g. AWS NLB with "proxy-protocol-v2" target attr).
+    On Hetzner Load Balancer this matters if clients come through a cloud LB;
+    on a direct NodePort / hostNetwork path, Envoy sees the real client IP.
+*/ -}}
+{{- range $listener := list "pgwire" "kafka" "flight" "flightsql" "auth" "auth-https" }}
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata:
+  name: boilstream-any-{{ $listener }}-sticky
+  namespace: {{ $.Values.namespace }}
+  labels:
+    {{- include "boilstream.labels" $ | nindent 4 }}
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: TLSRoute
+      name: boilstream-any-{{ $listener }}
+  loadBalancer:
+    type: ConsistentHash
+    consistentHash:
+      type: SourceIP
+---
+{{- end }}
+{{- end }}

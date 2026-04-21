@@ -13,7 +13,8 @@ spec:
   ports:
     - { name: pgwire,    port: 5432,  targetPort: 5432 }
     - { name: kafka,     port: 9092,  targetPort: 9092 }
-    - { name: flight,    port: 50050, targetPort: 50050 }
+    - { name: flight,    port: 50051, targetPort: 50051 }
+    - { name: flightsql, port: 50250, targetPort: 50250 }
     - { name: auth,      port: 8443,  targetPort: 8443 }
     - { name: cluster,   port: 8444,  targetPort: 8444 }
 ---
@@ -32,9 +33,10 @@ spec:
   selector:
     statefulset.kubernetes.io/pod-name: boilstream-{{ $i }}
   ports:
-    - { name: pgwire,  port: 5432,  targetPort: 5432 }
-    - { name: kafka,   port: 9092,  targetPort: 9092 }
-    - { name: flight,  port: 50050, targetPort: 50050 }
-    - { name: auth,    port: 8443,  targetPort: 8443 }
+    - { name: pgwire,    port: 5432,  targetPort: 5432 }
+    - { name: kafka,     port: 9092,  targetPort: 9092 }
+    - { name: flight,    port: 50051, targetPort: 50051 }
+    - { name: flightsql, port: 50250, targetPort: 50250 }
+    - { name: auth,      port: 8443,  targetPort: 8443 }
 ---
 {{- end }}

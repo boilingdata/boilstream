@@ -100,7 +100,14 @@ spec:
           ports:
             - { name: pgwire,  containerPort: 5432 }
             - { name: kafka,   containerPort: 9092 }
-            - { name: flight,  containerPort: 50050 }
+            # FlightRPC — Thread 1 is the documented client entry point
+            # (flight_base_port + 1). Thread 0 on :50050 is also listening but not
+            # exposed externally; DuckDB airport extension / ADBC FlightSQL clients
+            # connect to :50051.
+            - { name: flight,  containerPort: 50051 }
+            # FlightSQL consumer server (server.consumer_flight_port) — separate
+            # service from the ingestion Flight servers.
+            - { name: flightsql, containerPort: 50250 }
             - { name: auth,    containerPort: 8443 }
             - { name: cluster, containerPort: 8444 }
             - { name: metrics, containerPort: 8081 }
@@ -116,6 +123,17 @@ spec:
               value: "/cfg/trust-bundle.crt"
             - name: CURL_CA_BUNDLE
               value: "/cfg/trust-bundle.crt"
+            # FlightRPC/FlightSQL TLS. src/tls.rs::load_tls_config_from_env()
+            # only reads these env vars (or TLS_CERT_PEM/TLS_KEY_PEM); the
+            # top-level `tls.cert_path` in config.yaml is not honored by the
+            # env-based loader. Keeping the env vars here avoids a code change.
+            # The top-level `tls.disabled: false` in the rendered config is
+            # still required — it gates whether load_tls_config_from_env()
+            # is called at all (see src/tls.rs line 70-73).
+            - name: TLS_CERT_PATH
+              value: "/tls/tls.crt"
+            - name: TLS_KEY_PATH
+              value: "/tls/tls.key"
             {{- if .Values.testMode.disableTurnstile }}
             - name: DISABLE_TURNSTILE
               value: "1"
