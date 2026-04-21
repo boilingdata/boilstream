@@ -5,6 +5,19 @@ All notable changes to BoilStream will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.8] - 2026-04-21
+
+### Fixes
+
+- **Broken auth landing page on `https://<domain>/`** (introduced 0.10.7 and earlier): `https://app.boilstream.com/` served the auth HTML but the browser got 404 for `/auth/boilstream-auth.min.js` and an empty-MIME response for `/auth/boilstream-auth.min.css`. Result: no layout (floated to the left), no JS (sign-up button dead, login submit dead). Root cause: `.gitignore` excluded `static/auth/*.min.{js,css}`. EC2 release builds use `git archive` on HEAD, so the minified GUI bundles never made it into the source tarball; `rust_embed` then had nothing to serve at those paths. The non-minified `auth.css` fallback via the HTML's `onerror` handler worked, but no such fallback existed for the JS bundle, so the page broke silently.
+  - **Fix**: the minified bundles are now re-generated on every `cargo build` by `build.rs` (runs `npm run build` in `static/auth/` when `main.js` / `auth.css` / HTML / `package.json` change) and are never committed. The release build scripts install Node 20 on the EC2 AMI (`setup_ubuntu_vm.sh`) and run `npm ci && npm run build` before cargo as a belt-and-suspenders step. A regression test (`tests/auth_assets_embedded_test.rs`) asserts `boilstream-auth.min.{js,css}` and `index.html` are present in the final binary — CI fails if the gitignore bug ever recurs.
+- **`boilstream-admin user delete` 401 with empty body**: the CLI loaded the superadmin MFA secret via a non-profile-aware path that probed `./superadmin_mfa_secret.txt` (CWD) before `~/.boilstream/<profile>/mfa_secret.txt`. On a dev-checkout running against a live cluster, a stale local-dev secret in the repo root silently signed the delete request with the wrong TOTP. The server correctly rejected with "Invalid fresh TOTP code". Login worked because login explicitly uses `load_mfa_secret_for_profile(profile)`. Fixed by threading the profile name through `delete_user`, `verify_superadmin_mfa`, and `verify_user_mfa`, and by making `load_mfa_secret_for_profile` check `~/.boilstream/<profile>/mfa_secret.txt` (the `scripts/boilstream-admin-k8s-setup.sh` convention) in addition to the older `~/.boilstream/sessions/<profile>_mfa.txt` layout.
+- **`boilstream-admin tenant list` misleading error**: printed "Tenant list requires cluster connection. Use --server flag" where `--server` is not a valid argument. Now prints an honest "not yet implemented — no REST endpoint for catalog→node placement yet" and points operators at `catalog list` / `node list` / `tenant handover` as working alternatives.
+
+### Notes
+
+- Chart version **0.3.14** tracks appVersion `0.10.8`.
+
 ## [0.10.7] - 2026-04-20
 
 ### Features
