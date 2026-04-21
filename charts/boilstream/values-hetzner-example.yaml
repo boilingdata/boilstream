@@ -12,7 +12,7 @@
 #   helm install boilstream ./charts/boilstream \
 #     -f charts/boilstream/values-hetzner-example.yaml \
 #     --set image.repository=<your-cfcr-tenant>.europe.registry.cloudfleet.dev/boilstream \
-#     --set image.tag=0.10.7-pro-1.5.2 \
+#     --set image.tag=0.10.8-pro-1.5.2 \
 #     --set superadmin.existingSecret=boilstream-superadmin
 
 replicas: 2                              # 2 nodes, 1 pod each
@@ -25,7 +25,7 @@ image:
   # Ampere A1 / other non-Graviton-3+ ARM64 hosts need to avoid SIGILL on
   # SHA3 / SHA512 paths.
   repository: docker.io/boilinginsights/boilstream
-  tag: aarch64-generic-linux-0.10.7
+  tag: aarch64-generic-linux-0.10.8
   pullPolicy: IfNotPresent
   pullSecrets: []                        # Docker Hub is public; no pull secret needed
 
