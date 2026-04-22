@@ -5,6 +5,23 @@ All notable changes to BoilStream will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.10] - 2026-04-22
+
+### Fixes
+
+- **Cross-pod PGWire session rejection** ("Could not determine tenant for user `user_…`. Connection rejected for security."): workers resolved the PGWire username → (internal_user_id, user_id, tenant_id) tuple against their local DuckDB. Both lookups are unsafe on a follower — `temp_credentials` is leader-exclusive (never replicated), and the `users.duckdb` snapshot restored on pod start can lag behind leader-side user creation. A user who signed up while the follower was already running was effectively invisible to that pod, so sticky source-IP load-balancing routing them to it produced a hard rejection after a successful SCRAM handshake. The 0.10.7 SCRAM-hash RPC closed only half of this gap.
+  - **Fix**: new `GetPgwireUserContext(username)` RPC on the `ClusterSync` service. Workers atomically fetch the full tuple from the leader; a leader-confirmed not-found is authoritative (no fall-back to stale local state). Leader-side handler on `ClusterSyncState` reads both `oauth_store` and `users_store`, mirrors the prefix whitelist from `pgwire_server::get_user_ids_for_username`, and returns `(found, internal_user_id, user_id, tenant_id)`. Safe to run on a 0.10.10 leader with older workers — the RPC is additive, workers from 0.10.9 and earlier simply don't call it.
+- **MFA re-enrollment required after every pod restart**: `/data` is an emptyDir volume; `users.duckdb` is restored at cold-start from the leader's last S3 snapshot. But the backup manager only ever uploaded when a handler explicitly called `trigger_backup()`, and `mfa_handlers.rs` never did. TOTP enrollment, passkey registration, passkey counter updates, backup-code consumption — none of them hit S3, so a helm upgrade wiped the user's MFA state and forced a re-enroll.
+  - **Fix**: `trigger_users_backup(state)` called after every MFA mutation (TOTP enroll, passkey add, passkey counter update on auth, TOTP/passkey delete, backup-code consumption, backup-code regeneration, `remove_mfa_method`, and the `mark_session_mfa_verified` paths).
+  - **Also fixed**: `trigger_backup()` itself was partially synchronous — the first-ever trigger and interval-elapsed triggers awaited `perform_backup().await` inline, meaning the auth handler that just registered a passkey blocked on an S3 PUT before returning to the browser. Now `trigger_backup()` is a pure non-blocking flag-flip; the background task owns all upload execution and ticks every 1s on the leader. Burst triggers inside the `interval_seconds` window (default 60s) coalesce to one upload; triggers arriving during an in-flight upload re-arm `pending` for the next cycle so nothing is silently dropped.
+  - Regression tests verify the three contract properties: non-blocking triggers, burst coalescing, and in-flight re-arming.
+- **Auth GUI connection-string missing direct-TLS hint**: the database-credentials page rendered `postgresql://user:pass@host:5432/db` with no `sslmode` / `sslnegotiation` suffix, so psql users got "server closed the connection unexpectedly" on first paste. The Envoy Gateway TLSRoute-passthrough listener accepts raw TLS but not libpq's default plaintext `SSLRequest` preamble, so libpq needs `sslmode=require&sslnegotiation=direct` (libpq 17+) to speak ALPN-negotiated TLS from byte zero.
+  - **Fix**: `static/auth/common.js` and `static/auth/db_credentials.html` now emit the full query string. `boilstream-admin` vend paths (superadmin + user vend, server-status output, and the spawned `psql` child via `PGSSLMODE=require` + `PGSSLNEGOTIATION=direct`) include the same suffix.
+
+### Notes
+
+- Chart version **0.3.16** tracks appVersion `0.10.10`.
+
 ## [0.10.8] - 2026-04-21
 
 ### Fixes
