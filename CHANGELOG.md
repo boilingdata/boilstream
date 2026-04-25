@@ -5,6 +5,111 @@ All notable changes to BoilStream will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.19] - 2026-04-25
+
+### Features
+
+- **DuckLake catalog spec 1.0**. Catalogs created by BoilStream now carry the spec 1.0 stability marker, matching what the bundled DuckLake extension in stock DuckDB ≥ 1.5.2 expects. Existing 0.4 catalogs auto-upgrade in place on the first ATTACH that opts in:
+  ```sql
+  ATTACH 'ducklake:postgres:host=…;port=…;…' AS cat (TYPE ducklake, AUTOMATIC_MIGRATION true);
+  ```
+  No data migration runs — 0.4 → 1.0 is a no-schema-change marker. After this release, anybody on stock DuckDB / pip `duckdb` / Homebrew `duckdb` can connect without a custom build.
+
+### Notes
+
+- Chart version **0.3.25** tracks appVersion `0.10.19`.
+
+## [0.10.18] - 2026-04-24
+
+### Features
+
+- **Vended DuckLake credentials default to the per-pod TCP path.** When BoilStream hands a remote DuckDB / psql / DBeaver client a connection string, the host + port now point at the dedicated per-pod gateway listener introduced in 0.10.17 instead of the SNI-multiplexed `:5432`. Result: the connection string copied out of the auth GUI or the admin CLI just works with traditional `sslmode=require` and any libpq version, including the older one bundled inside DuckDB's stock `postgres` extension.
+
+### Notes
+
+- Chart version **0.3.24** tracks appVersion `0.10.18`.
+
+## [0.10.17] - 2026-04-24
+
+### Features
+
+- **Per-pod TCP listener for PGWire — direct-TLS-free connectivity for any libpq.** The Helm chart now provisions one extra Envoy `TCPRoute` per BoilStream pod on `pgwire.publicTcpPortBase + pod_index` (default `15432`, `15433`, …). These listeners are pure L4 passthrough — Envoy does not parse TLS — so the pod handles the full Postgres SSL handshake itself. Clients can therefore use the traditional `sslmode=require` (no `sslnegotiation=direct`, no ALPN) and BoilStream is reachable from:
+  - DBeaver (any pgjdbc bundle), Tableau, PowerBI ODBC, Metabase
+  - DuckDB's stock `postgres` extension (libpq < 17)
+  - Python `psycopg`, Go `lib/pq` / `pgx`, Node.js `pg`, Ruby `pg`
+  - Anything else that speaks libpq ≥ 9
+- **`pgwire.publicTcpPortBase` chart value** (default `15432`). Operators can shift the port range if it conflicts with an existing service.
+- The classical `:5432` SNI-routed listener is unchanged; clients with libpq 17 / psql 17 / pgjdbc 42.7+ that send `sslnegotiation=direct` continue to use it for SNI-based pod selection.
+
+### Notes
+
+- Chart version **0.3.23** tracks appVersion `0.10.17`.
+
+## [0.10.16] - 2026-04-23
+
+### Features
+
+- **Vended DuckLake credentials carry public DNS names.** The `host` field in vended credentials is now the externally-resolvable per-pod FQDN (`boilstream-N.<your domain>`) rather than the in-cluster `*.svc.cluster.local`. Remote DuckDB / BI tools running outside the cluster can now use the credentials directly without DNS rewrites or a kubectl port-forward.
+
+### Notes
+
+- Chart version **0.3.22** tracks appVersion `0.10.16`.
+
+## [0.10.15] - 2026-04-23
+
+### Features
+
+- **`boilstream-admin` pins its session to whichever pod served the login.** When a login follows a leader-redirect across pod subdomains, the CLI now records the final endpoint and uses it for every subsequent admin call in the same session. No more "session token not found" surprises after a redirect on a multi-pod deployment.
+
+### Notes
+
+- Chart version **0.3.21** tracks appVersion `0.10.15`.
+
+## [0.10.14] - 2026-04-23
+
+### Features
+
+- **Session cookies scoped to the configured `app_domain`.** Cookies issued at login now span the bare domain and every per-pod subdomain. Browsers and CLI clients that follow a leader-redirect (`https://app.example.com/` → `https://boilstream-1.app.example.com:8443/`) keep the same authenticated session — no re-login, no broken Set-Cookie scope.
+- **SAML logout cookie scope aligned** with the same domain rule.
+
+### Notes
+
+- Chart version **0.3.20** tracks appVersion `0.10.14`.
+
+## [0.10.13] - 2026-04-23
+
+### Features
+
+- **DuckLake catalogs self-heal on first credential vend.** Catalogs that didn't fully complete the two-phase initialization (DuckDB metadata row + Postgres role) now repair themselves the next time someone asks for credentials, instead of returning an opaque "missing role" error. A new `boilstream-admin catalog repair <id>` command exposes the same logic for operators who want to run it explicitly. The healer holds a per-catalog mutex so concurrent vends don't race on `CREATE ROLE`.
+- **`boilstream-admin` honours `mfa_secret_path` from the active profile config.** Previously the path was only loaded for some commands; now the resolution is consistent across login, vend, and admin operations, and falls back to the legacy `~/.boilstream/sessions/<profile>_mfa.txt` location when the profile config doesn't set it.
+
+### Notes
+
+- Chart version **0.3.19** tracks appVersion `0.10.13`.
+
+## [0.10.12] - 2026-04-22
+
+### Features
+
+- **Helm chart auto-generates the superadmin TOTP secret.** First install creates `boilstream-superadmin-mfa` as a Kubernetes Secret with `helm.sh/resource-policy: keep`, so subsequent `helm upgrade` runs preserve the value. Operators can pre-create the Secret to bring their own MFA secret instead. Removes the manual `kubectl create secret` step from the Hetzner / EKS bring-up flow.
+- **Documented end-to-end customer setup flow** for k8s deployments — see the new "Kubernetes / Helm deployments" section in the admin CLI guide.
+- **Staging E2E test harness now uses the real customer path** (login through admin CLI, then vend through CLI). Removes a test-only HTTP shortcut that diverged from production behaviour.
+
+### Notes
+
+- Chart version **0.3.18** tracks appVersion `0.10.12`.
+
+## [0.10.11] - 2026-04-22
+
+### Features
+
+- **Bootstrap-token generation works on any pod.** Previously the `/auth/api/admin/bootstrap-token` endpoint only succeeded when called against the leader; non-leader pods returned an error. Workers now fetch the bootstrap context from the leader over the internal mTLS RPC channel introduced in 0.10.7, so the customer-onboarding flow is symmetric across all pods.
+- **Staging E2E test suite is now parameterizable**: setting `AUTH_URL=https://app.<domain>` lets the same test binary drive a live cluster instead of a local dev server.
+
+### Notes
+
+- Chart version **0.3.17** tracks appVersion `0.10.11`.
+
 ## [0.10.10] - 2026-04-22
 
 ### Fixes
