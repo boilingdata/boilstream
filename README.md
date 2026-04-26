@@ -102,6 +102,19 @@ INSERT INTO my_data__stream.main.events
    FROM generate_series(1, 20000) AS t(i);
 ```
 
+## Kubernetes
+
+A production-ready Helm chart ships in [`charts/boilstream`](./charts/boilstream/) — StatefulSet, per-pod Envoy Gateway routes (TLS-passthrough SNI + per-pod L4 TCPRoute), cert-manager TLS, S3-coordinated cluster mode, and optional pod-to-pod mTLS.
+
+```bash
+helm install boilstream oci://ghcr.io/boilingdata/charts/boilstream \
+  --version 0.3.27 \
+  -n boilstream --create-namespace \
+  -f my-values.yaml
+```
+
+Reference overlays: [`values-eks-example.yaml`](./charts/boilstream/values-eks-example.yaml) (AWS EKS + IRSA + S3) and [`values-hetzner-example.yaml`](./charts/boilstream/values-hetzner-example.yaml) (CloudFleet + Hetzner ARM64 + Hetzner Object Storage). Full walkthrough: [docs.boilstream.com/guide/kubernetes](https://docs.boilstream.com/guide/kubernetes.html).
+
 ## Requirements
 
 - 8GB+ RAM recommended

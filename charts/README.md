@@ -10,7 +10,7 @@ Official Helm charts for deploying BoilStream on Kubernetes.
 
 ```bash
 helm install boilstream oci://ghcr.io/boilingdata/charts/boilstream \
-  --version 0.3.0 \
+  --version 0.3.27 \
   -n boilstream --create-namespace \
   -f my-values.yaml
 ```
