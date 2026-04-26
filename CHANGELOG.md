@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **PGWire stability for clients that auto-name prepared statements.** Connection-pool reuse no longer leaks server-side prepared statements between successive PGWire clients, which previously surfaced as intermittent `prepared statement "sN" already exists` errors against any libpq / tokio-postgres / pgjdbc workload that allocates statement names automatically (DBeaver, Tableau ODBC, Power BI, JDBC apps, psycopg, DuckDB's bundled `postgres` extension). 31 binary-parameter / parameter-types / boolean-encoding / prepared-statement test cases now pass deterministically against staging where they previously flaked. No client-side changes required.
 
+### Chart 0.3.28 — Hetzner / CloudFleet survivability
+
+- **`values-hetzner-example.yaml` now selects nodes via `karpenter.sh/nodepool: boilstream-arm64-hel`** instead of the CFKE-template label `boilstream.com/nodepool: arm64-hel`. The Karpenter-managed label is auto-applied to every node Karpenter provisions, so freshly-spun-up nodes are picked up without any extra requirement on the NodePool spec — and CFKE forbids customers from modifying NodePool requirements directly.
+- **Chart catches up to the per-pod TCPRoute work shipped in 0.10.17 / 0.10.18**: `pgwire.publicTcpPortBase` (default `15432`), the `__POD_TCP_PORT__` substitution in the rendered config, and the per-pod `TCPRoute` listeners are now on the public chart. Customers running the public chart no longer need to pin to a pre-0.10.17 image.
+
 ### Notes
 
 - Chart version **0.3.27** tracks appVersion `0.10.21`.

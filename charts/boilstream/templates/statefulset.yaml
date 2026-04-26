@@ -1,5 +1,6 @@
 {{- $tlsSecret := default "boilstream-wildcard-tls" .Values.tls.existingSecret -}}
 {{- $superSecret := default "boilstream-superadmin" .Values.superadmin.existingSecret -}}
+{{- $superMfaSecret := default "boilstream-superadmin-mfa" .Values.superadmin.existingMfaSecret -}}
 {{- $clusterTlsSecret := default "boilstream-cluster-mtls" .Values.clusterTls.existingSecret -}}
 apiVersion: apps/v1
 kind: StatefulSet
@@ -81,13 +82,11 @@ spec:
                   name: {{ .Values.s3.existingCredsSecret }}
                   key: secret_key
             {{- end }}
-            {{- if .Values.superadmin.existingMfaSecret }}
             - name: SUPERADMIN_MFA_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.superadmin.existingMfaSecret }}
+                  name: {{ $superMfaSecret }}
                   key: mfa_secret
-            {{- end }}
           volumeMounts:
             - { name: config-tpl, mountPath: /tpl }
             - { name: config,     mountPath: /cfg }

@@ -22,6 +22,16 @@ image:
 # <pod-name>.<domain>:<port> via SNI through Envoy Gateway.
 domain: boilstream.test
 
+# PgWire external exposure.
+pgwire:
+  # Base TCP port for per-pod direct listeners. Each pod gets its own Envoy
+  # TCPRoute on `publicTcpPortBase + pod_index` (e.g. 15432, 15433, ...).
+  # Traffic is forwarded L4-plain to the pod's :5432, so clients speak the
+  # traditional Postgres SSL flow (plaintext SSLRequest → TLS upgrade)
+  # directly with the pod — no SNI, no `sslnegotiation=direct`, works with
+  # DuckDB's bundled libpq <17.
+  publicTcpPortBase: 15432
+
 # S3 / object storage for cluster coordination + per-user catalog backups.
 s3:
   endpoint: http://host.docker.internal:9000

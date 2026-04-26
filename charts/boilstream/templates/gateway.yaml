@@ -67,6 +67,25 @@ spec:
       allowedRoutes:
         namespaces: { from: Same }
         kinds: [ { kind: TLSRoute } ]
+    {{- /*
+      Per-pod PgWire TCP passthrough (TCPRoute, NOT TLSRoute). Each listener
+      is a pure L4 pipe from its LB port straight into one specific pod's
+      :5432. Envoy doesn't parse TLS for these — the plaintext Postgres
+      SSLRequest preamble reaches the pod unmolested, so libpq ≥9 (incl.
+      DuckDB's bundled libpq <17) can connect with plain `sslmode=require`.
+      The port we pick is `pgwire.publicTcpPortBase + pod_index` so clients
+      compute it as `15432 + N` without coordination, matching
+      `boilstream-N.{{ .Values.domain }}`.
+    */}}
+    {{- $tcpBase := int .Values.pgwire.publicTcpPortBase }}
+    {{- range $i, $_ := until (int .Values.replicas) }}
+    - name: pgwire-pod-{{ $i }}
+      protocol: TCP
+      port: {{ add $tcpBase $i }}
+      allowedRoutes:
+        namespaces: { from: Same }
+        kinds: [ { kind: TCPRoute } ]
+    {{- end }}
 ---
 {{- $vals := . -}}
 {{- /*
@@ -126,6 +145,30 @@ spec:
           port: {{ $port }}
           weight: 1
         {{- end }}
+---
+{{- end }}
+
+{{- /*
+  Per-pod PgWire TCPRoutes. One route per pod, each attached to its own
+  dedicated TCP listener. No SNI, no hostname filtering — the listener
+  itself has exactly one backend, so Envoy is a straight L4 proxy. Clients
+  use `host=boilstream-N.{{ .Values.domain }} port={{ .Values.pgwire.publicTcpPortBase }}+N`
+  and talk plain Postgres + SSLRequest upgrade to the pod.
+*/}}
+{{- $tcpBase := int .Values.pgwire.publicTcpPortBase }}
+{{- range $i, $_ := until (int .Values.replicas) }}
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: TCPRoute
+metadata:
+  name: boilstream-{{ $i }}-pgwire-tcp
+  namespace: {{ $vals.Values.namespace }}
+spec:
+  parentRefs:
+    - { name: boilstream, sectionName: pgwire-pod-{{ $i }} }
+  rules:
+    - backendRefs:
+        - name: boilstream-{{ $i }}
+          port: 5432
 ---
 {{- end }}
 {{- end }}

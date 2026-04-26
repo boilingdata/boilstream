@@ -76,11 +76,21 @@ data:
     #                   clients can connect back to the correct pod from outside
     #                   the cluster. Kept in sync with the per-pod TLSRoute in
     #                   gateway.yaml: boilstream-N.{{ .Values.domain }}
+    # public_tcp_port = per-pod external TCP port baked into vended DuckLake
+    #                   credentials. Pairs with the per-pod `TCPRoute` listener
+    #                   in gateway.yaml at `publicTcpPortBase + pod_index`.
+    #                   Envoy forwards that port L4-plain straight to the
+    #                   pod's :5432, so remote clients speak traditional
+    #                   Postgres SSL (plaintext SSLRequest → TLS upgrade)
+    #                   with the pod directly — DuckDB's bundled libpq <17
+    #                   works with just `sslmode=require`. __POD_TCP_PORT__
+    #                   is resolved by the shell below once POD_NAME is known.
     cluster_block = '''cluster_mode:
       enabled: true
       node_id_path: "/data/node-id"
       advertised_host: "__POD_NAME__.boilstream-headless.__NS__.svc.cluster.local"
       public_host: "__POD_NAME__.{{ .Values.domain }}"
+      public_tcp_port: __POD_TCP_PORT__
       internal_api_port: 8444
       leader_heartbeat_interval_secs: 15
       leader_stale_threshold_secs: 60
@@ -189,8 +199,14 @@ data:
     with open(p, 'w') as f: f.write(c)
     PY
 
-    # Substitute pod-specific placeholders in the final config
-    sed -i "s/__POD_NAME__/${POD_NAME}/g; s/__NS__/${NS}/g" /cfg/config.yaml
+    # Substitute pod-specific placeholders in the final config.
+    # POD_TCP_PORT = publicTcpPortBase + pod ordinal. StatefulSet names pods
+    # as <statefulset>-0, <statefulset>-1, ... so the trailing integer is
+    # the ordinal. Adding it to the base (15432) gives each pod a unique
+    # external TCP port matching the gateway's per-pod TCPRoute listener.
+    POD_ORDINAL="${POD_NAME##*-}"
+    POD_TCP_PORT=$(( {{ int .Values.pgwire.publicTcpPortBase }} + POD_ORDINAL ))
+    sed -i "s/__POD_NAME__/${POD_NAME}/g; s/__NS__/${NS}/g; s/__POD_TCP_PORT__/${POD_TCP_PORT}/g" /cfg/config.yaml
 
     # Generate (once per pod) a self-signed loopback cert covering
     # 127.0.0.1 / ::1 / localhost. Auth server serves this cert via SNI for
