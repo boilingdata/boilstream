@@ -39,7 +39,6 @@ See [GitHub releases](https://github.com/boilingdata/boilstream/releases) for th
 ```bash
 # Download — pick your platform from:
 #   darwin-aarch64   Apple Silicon Mac
-#   darwin-x64       Intel Mac
 #   linux-aarch64    Linux ARM64 — AWS Graviton-tuned (fastest on AWS EC2 Graviton 2/3/4)
 #   linux-x64        Linux x86_64
 #   windows-x64      Windows
