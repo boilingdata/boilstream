@@ -43,7 +43,7 @@ See [GitHub releases](https://github.com/boilingdata/boilstream/releases) for th
 #   linux-aarch64    Linux ARM64 — AWS Graviton-tuned (fastest on AWS EC2 Graviton 2/3/4)
 #   linux-x64        Linux x86_64
 #   windows-x64      Windows
-# Replace {VERSION} with the latest release (see GitHub releases above, e.g. 0.10.21)
+# Replace {VERSION} with the latest release (see GitHub releases above, e.g. 0.10.24)
 curl -L -o boilstream https://www.boilstream.com/binaries/darwin-aarch64/boilstream-{VERSION}
 curl -L -o boilstream-admin https://www.boilstream.com/binaries/darwin-aarch64/boilstream-admin-{VERSION}
 chmod +x boilstream boilstream-admin

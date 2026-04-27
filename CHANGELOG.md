@@ -5,6 +5,71 @@ All notable changes to BoilStream will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.24] - 2026-04-27
+
+### Fixes
+
+- **License-binding prefix mismatch on multi-pod clusters.** The runtime `ClusterBinding` was built from the cluster_state directory prefix (e.g. `cluster/cluster_state/`) while licenses are signed against, and `boilstream-admin license request` reports, the parent prefix (`cluster/`). On 0.10.23 every valid license was rejected with `WrongBinding` and the cluster fell back to community caps. Fixed by trimming the trailing `cluster_state/` segment in `ClusterConfig::license_binding_prefix()` before binding comparison.
+
+### Enhancements
+
+- **Automatic `cluster_secret.json` bootstrap on first leader election.** Previously, `boilstream-admin license install` would fail its pre-flight binding check on a brand-new cluster because nothing wrote `cluster_state/cluster_secret.json` until an operator did so by hand. The elected leader (both at initial startup and during failover promotion) now creates it via an atomic `PutMode::Create` on first leadership acquisition. The persisted bytes become the source of truth for `cluster_secret_hash` going forward, and the file is available before the first license refresh runs.
+- **Race-safe across multi-pod startup** — when several pods race for leadership and call the bootstrap simultaneously, exactly one wins the conditional PUT; the loser falls through to GET and continues with the winner's secret.
+- **Pre-existing secrets are never overwritten** — operators migrating from a previous deployment can pre-seed `cluster_secret.json`; the bootstrap detects the existing object and adopts it.
+
+### Notes
+
+- Chart version **0.3.31** tracks appVersion `0.10.24`.
+
+## [0.10.23] - 2026-04-26
+
+### Enhancements — License integrity hardening
+
+License enforcement gains four layers of defence against binary tampering and signed-license replay. No customer-visible API changes.
+
+- **Embedded public-key hash-pin.** The license module's primary and secondary ed25519 PEMs are SHA-256 hashed at build time and re-checked at every load. A binary patcher who swaps the embedded PEM bytes must also find and patch the (separately-located) hex digest constants.
+- **Memory integrity checker.** The leader heartbeat re-hashes both PEMs in-memory each cycle and trips a sticky `tampered` flag on drift. Once set, all data-plane cap checks (PGWire, Flight, Kafka) deny new connections until the operator restarts the process.
+- **M-of-2 dual-key signature.** Operators can mint licenses dual-signed with two offline private keys. Both signatures must verify; either side's failure trips the same `LicenseError::Signature` as a wholly-invalid token.
+- **Replay watermark persistence.** The highest accepted `iat` is now persisted to `cluster_state/license_min_iat.json` alongside the license file. After a leader restart, an attacker who tries to reinstall an older signed license trips the watermark.
+- **Runtime cap re-check at four sites** — broker register, PGWire connection accept, Flight `do_get`/`do_put`, and Kafka producer connect all consult the cached license + cached cluster usage. A binary patcher who removes one site still trips on the others.
+- **Audit-grep startup line** — `License enforcement: vCPU cap=N pod cap=M tier=T (in_grace=…, tampered=…)` emitted at process start.
+
+### Notes
+
+- Chart version **0.3.30** tracks appVersion `0.10.23`.
+
+## [0.10.22] - 2026-04-26
+
+### Features — License-enforced cluster caps (NEW)
+
+BoilStream now enforces cluster-wide vCPU and pod caps from a signed, ed25519-verified license. Without a license the cluster runs on the free tier (8 vCPU / 2 pods cluster-wide); a valid license unlocks higher caps. The upgrade path for paying customers is a single S3 file drop — no restart, no helm upgrade, no environment variable changes.
+
+#### What's new for operators
+
+- `boilstream-admin license install <path-to-license.jwt>` — locally validates the signature, the bucket/prefix binding, and the cluster-secret hash, then PUTs the license to `s3://<bucket>/<prefix>cluster_state/license.json`. The leader picks it up within 30 s without a restart.
+- `boilstream-admin license status` — prints the installed license (tier, expiry, caps), and the cluster's current usage in vCPU and active pods.
+- `boilstream-admin license request` — prints the bucket / prefix / `cluster_secret_hash` triple a customer pastes into an email to `licenses@boilstream.com` to receive a signed license.
+- `boilstream-admin license remove` — deletes the license file (interactive confirm). The cluster reverts to free tier on the next heartbeat.
+
+#### What's new under the hood
+
+- Each broker reports its physical-vCPU count to S3 in its registration record. The leader sums vCPU and pod count across non-stale brokers and rejects new registrations that would exceed the effective cap with a structured error: `License cap exceeded: cluster currently uses N vCPU / M pods, license allows X vCPU / Y pods, this pod would push to N+k / M+1`.
+- Existing pods (heartbeat refresh, leader↔worker flip, restart) are never rejected — only NEW registrations are gated. Failover semantics preserved.
+- 14-day grace period after a license expires (configurable). During grace, the leader logs WARN per heartbeat but keeps running the licensed tier. Past grace, the cluster falls back to free tier.
+- ±300 s clock-skew tolerance for `iat` and `exp`.
+- License binding to bucket + prefix + `sha256(cluster_secret.json)` prevents cross-cluster license reuse.
+
+#### Free tier limits
+
+| Tier      | vCPU cap | Pod cap |
+| --------- | -------- | ------- |
+| community | 8        | 2       |
+
+### Notes
+
+- Chart version **0.3.28** tracks appVersion `0.10.22`.
+- License enforcement only activates when the cluster coordinator is built with a non-empty bucket name (i.e., real cluster mode). Single-node / standalone deployments are unaffected.
+
 ## [0.10.21] - 2026-04-26
 
 ### Fixes

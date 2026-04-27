@@ -6,8 +6,8 @@ description: |
   support. Each pod participates in S3-based leader election and serves
   per-user catalogs; failed pods are recovered from S3 backups.
 type: application
-version: 0.3.28
-appVersion: "0.10.21"
+version: 0.3.31
+appVersion: "0.10.24"
 kubeVersion: ">=1.27.0"
 keywords:
   - streaming
