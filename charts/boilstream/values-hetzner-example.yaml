@@ -12,7 +12,7 @@
 #   helm install boilstream ./charts/boilstream \
 #     -f charts/boilstream/values-hetzner-example.yaml \
 #     --set image.repository=<your-cfcr-tenant>.europe.registry.cloudfleet.dev/boilstream \
-#     --set image.tag=aarch64-linux-0.10.25 \
+#     --set image.tag=aarch64-linux-0.10.26 \
 #     --set superadmin.existingSecret=boilstream-superadmin
 
 replicas: 2                              # 2 nodes, 1 pod each
@@ -26,7 +26,7 @@ image:
   # SHA3 / SHA512 paths. There is no separate "-generic-" variant — this
   # is the only ARM64 image we publish.
   repository: docker.io/boilinginsights/boilstream
-  tag: aarch64-linux-0.10.25
+  tag: aarch64-linux-0.10.26
   pullPolicy: IfNotPresent
   pullSecrets: []                        # Docker Hub is public; no pull secret needed
 

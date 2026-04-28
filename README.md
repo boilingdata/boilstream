@@ -44,7 +44,7 @@ See [GitHub releases](https://github.com/boilingdata/boilstream/releases) for th
 #                    Apple Silicon under Docker.
 #   linux-x64        Linux x86_64
 #   windows-x64      Windows
-# Replace {VERSION} with the latest release (see GitHub releases above, e.g. 0.10.25)
+# Replace {VERSION} with the latest release (see GitHub releases above, e.g. 0.10.26)
 curl -L -o boilstream https://www.boilstream.com/binaries/darwin-aarch64/boilstream-{VERSION}
 curl -L -o boilstream-admin https://www.boilstream.com/binaries/darwin-aarch64/boilstream-admin-{VERSION}
 chmod +x boilstream boilstream-admin

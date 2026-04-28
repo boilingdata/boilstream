@@ -5,7 +5,35 @@ All notable changes to BoilStream will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.10.25] - 2026-04-28
+## [0.10.26] - 2026-04-28
+
+Re-release of 0.10.25. The `0.10.25` images on Docker Hub were built
+from a stale source tarball (the EC2 build host pulls source from
+`s3://boilingdata-demo/source-packages/` and that prefix was a day
+behind `main`), so the binaries shipped under that tag are
+*pre-fix code* — broker entries don't carry `public_tcp_port`, the
+SPA still vends `port: 5432`, and the bare-`:5432`-removal in this
+release set is not effective on a cluster running 0.10.25. **Use
+0.10.26 instead.** Same scope as the original 0.10.25 entry below;
+no new product changes.
+
+Operational note added to the release pipeline: `make sync-s3` is
+now a hard prereq for `make ec2-release` so subsequent EC2 builds
+can't compile against a stale tarball.
+
+### Notes
+
+- Chart version **0.3.36** tracks appVersion `0.10.26`.
+
+## [0.10.25] - 2026-04-28 — RETRACTED
+
+> **Do not use the published `0.10.25` Docker images** —
+> `boilinginsights/boilstream:aarch64-linux-0.10.25` and
+> `boilinginsights/boilstream:x64-linux-0.10.25` were built from a
+> stale source tarball (S3 source-packages prefix was 1 day behind
+> `main`) and ship pre-fix code under the new version label. The
+> originally-intended changes are released as **0.10.26** instead;
+> upgrade to that tag.
 
 ### Breaking — public PGWire endpoint
 
