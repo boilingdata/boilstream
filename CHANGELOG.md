@@ -5,6 +5,26 @@ All notable changes to BoilStream will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.25] - 2026-04-28
+
+### Breaking — public PGWire endpoint
+
+- **Bare `:5432` Gateway listener removed.** DuckLake catalog token claims live only on the catalog's master pod (no cross-pod replication), so any L4-round-robin or SNI-mismatched client landing on the wrong pod failed with `DuckLake session metadata not found`. The chart no longer exposes `:5432` at all. The only public PGWire entry points are now the **per-pod TCPRoute listeners on `pgwire.publicTcpPortBase + pod_index`** (default `15432, 15433, …`) — pure L4 passthrough, plain `sslmode=require` works for any libpq, including DuckDB's bundled libpq <17. `boilstream-admin catalog credentials` and the Web Auth Console both already vend per-pod ports; clients pasting those connection strings need no changes. Operators with custom dashboards or scripts hard-coded to `:5432` must update them to use the per-pod port from the vended credentials.
+
+### Enhancements
+
+- **SPA `POST /auth/api/credentials` round-robins across pods.** Previously the Web Auth Console handed every user the static `config.pgwire.port` (`5432` — the listener we just removed). It now resolves `(host, port)` by round-robining `coord.broker_registry().cached_brokers()`, filtering brokers without `public_tcp_port` so `:5432` is never returned. Successive vend calls land on different pgwire pods — the horizontal scale-out path for SPA-vended `user_*` creds (workers fetch the SCRAM hash from the leader at connect time, so any pod can authenticate them).
+- **`BrokerInfo.public_tcp_port` published in S3 broker registry.** New optional field (`#[serde(default)]` for back-compat with pre-0.10.25 brokers) plus an `external_pgwire_port()` helper mirroring `NodeInfo`. The leader uses this to discover where each peer pod is reachable from outside the cluster.
+
+### Tests
+
+- New staging guard `auth::spa_credentials_distribution_test::test_spa_credentials_distribute_with_working_ports` — vends 12 SPA credentials, asserts none point at `:5432`, opens a real psql connection against each unique `(host, port)` and runs `SELECT 1`, asserts ≥2 distinct pods on multi-replica clusters. Added to `tests/staging-green.txt`.
+
+### Notes
+
+- Chart version **0.3.35** tracks appVersion `0.10.25`.
+- Single ARM64 Docker image (`aarch64-linux-0.10.25`) — built on AWS EC2 Graviton 2 (`c6gd.8xlarge` = Neoverse N1) so the same artefact runs on AWS Graviton 2/3/4, Hetzner cax*, Oracle Ampere A1, and Apple Silicon under Docker. The historical `aarch64-generic-linux-` infix is dropped — there is no longer a separate Graviton-tuned variant.
+
 ## [0.10.24] - 2026-04-27
 
 ### Fixes

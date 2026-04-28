@@ -21,7 +21,12 @@
     On Hetzner Load Balancer this matters if clients come through a cloud LB;
     on a direct NodePort / hostNetwork path, Envoy sees the real client IP.
 */ -}}
-{{- range $listener := list "pgwire" "kafka" "flight" "flightsql" "auth" "auth-https" }}
+{{- /*
+  Note: no `pgwire` entry — there's no bare-hostname pgwire route. Pgwire
+  reaches pods only via the per-pod TCP listeners (publicTcpPortBase + N),
+  which have a single backend each, so source-IP stickiness is moot.
+*/ -}}
+{{- range $listener := list "kafka" "flight" "flightsql" "auth" "auth-https" }}
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: BackendTrafficPolicy
 metadata:
