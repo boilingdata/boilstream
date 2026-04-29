@@ -5,6 +5,26 @@ All notable changes to BoilStream will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.27] - 2026-04-29
+
+### Fixes
+
+- **SPA `POST /auth/api/credentials` regular-user path was returning bare `:5432`.** 0.10.26's SPA round-robin landed on the superadmin branch only — the regular-user branch in `dashboard.rs::generate_credentials` kept the pre-fix `host: state.pgwire_host.clone()` / `port: state.pgwire_port`, so every `user_*` cred handed to the SPA pointed at `app.boilstream.com:5432`, the gateway listener the chart had just removed. The two `Json(CredentialsResponse {…})` blocks differed only in indentation (12 spaces in the superadmin nested block, 8 spaces at the function tail), which is why the original `replace_all` Edit only matched one of them. Caught when matview_stress (which registers fresh regular users) failed `Connection refused (os error 61)` on Phase 2; the existing staging guard authenticates as superadmin so it didn't see it. Added `auth::spa_credentials_distribution_test::test_spa_credentials_for_regular_user_returns_per_pod_port` to lock both paths down.
+
+### Pipeline
+
+- **`make ec2-release` now hard-prereqs `make sync-s3`** so the EC2 build host can't compile against a stale source tarball — the failure mode that caused the 0.10.25 retraction. `SKIP_SYNC_S3=1` bypasses for retries against an already-uploaded tarball.
+- **Test-fixture `dan@boilingdata.com` renamed to `integration-test-user@example.com`.** `scripts/reset_staging_test_users.sh` deletes every entry on every staging-test run; the previous address was real-looking enough to shadow operator inboxes. Reset list now carries a "RULE: only `@example.com`" comment to keep future maintainers from putting plausibly-real addresses on the auto-delete list.
+
+### Stress harness
+
+- `matview_stress` and `tantivy_stress` both extracted `host` from the SPA cred response but ignored `port`, so `--pgwire-port` (default 5432) was silently used. Both now read `creds["port"]` with the CLI flag as the local-dev fallback.
+
+### Notes
+
+- Chart version **0.3.37** tracks appVersion `0.10.27`.
+- Single ARM64 Docker image (`aarch64-linux-0.10.27`) plus `x64-linux-0.10.27`, both built on AWS EC2 (Graviton 2 / Intel Xeon).
+
 ## [0.10.26] - 2026-04-28
 
 Re-release of 0.10.25. The `0.10.25` images on Docker Hub were built
