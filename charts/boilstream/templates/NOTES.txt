@@ -1,0 +1,29 @@
+{{- if .Values.gateway.enabled }}
+{{- $hasClass := lookup "gateway.networking.k8s.io/v1" "GatewayClass" "" .Values.gateway.className -}}
+{{- if and (not $hasClass) (not .Values.gateway.createClass) }}
+
+╭──────────────────────────────────────────────────────────────────────╮
+│  WARNING — GatewayClass {{ printf "%q" .Values.gateway.className }} not found in this cluster
+│
+│  The chart's Gateway + TLSRoutes will sit Pending forever until you
+│  create it. Pick one:
+│
+│    1) Re-run with the chart's built-in flag:
+│         helm upgrade {{ .Release.Name }} ./charts/boilstream \
+│           --set gateway.createClass=true \
+│           --reuse-values
+│
+│    2) Apply the GatewayClass directly (one-shot):
+│         kubectl apply -f - <<'YAML'
+│         apiVersion: gateway.networking.k8s.io/v1
+│         kind: GatewayClass
+│         metadata: {{ printf "{ name: %s }" .Values.gateway.className }}
+│         spec: { controllerName: gateway.envoyproxy.io/gatewayclass-controller }
+│         YAML
+│
+│    3) Install Envoy Gateway's own helm chart, which creates one too:
+│         helm install eg oci://docker.io/envoyproxy/gateway-helm \
+│           --version v1.2.1 -n envoy-gateway-system --create-namespace
+╰──────────────────────────────────────────────────────────────────────╯
+{{- end }}
+{{- end }}

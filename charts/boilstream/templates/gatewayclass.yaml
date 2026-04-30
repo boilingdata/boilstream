@@ -1,0 +1,23 @@
+{{- /*
+  GatewayClass — referenced by the chart's Gateway via spec.gatewayClassName.
+
+  Rendered only when both gateway.enabled AND gateway.createClass are true.
+  Cluster-scoped resource; safe to ignore (no-op) when the Envoy Gateway
+  helm install already created it. Set createClass: true on first install
+  to a fresh cluster — the alternative is the standalone `kubectl apply`
+  documented in the chart README's prerequisites section.
+
+  If the GatewayClass is missing the Envoy Gateway controller logs
+  "no accepted gatewayclass" forever and the chart's Gateway never gets
+  programmed (no LB, no listeners, public traffic 400s at the edge).
+*/}}
+{{- if and .Values.gateway.enabled .Values.gateway.createClass }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: {{ .Values.gateway.className }}
+  labels:
+    {{- include "boilstream.labels" . | nindent 4 }}
+spec:
+  controllerName: {{ .Values.gateway.classControllerName | default "gateway.envoyproxy.io/gatewayclass-controller" }}
+{{- end }}

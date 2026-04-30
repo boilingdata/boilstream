@@ -5,6 +5,17 @@ All notable changes to BoilStream will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.28] - 2026-04-30
+
+### Fixes
+
+- **⚠️ Critical: multi-tenant secret bootstrap was broken in 0.10.27.** Every freshly-registered user that connected via PGWire and tried to `ATTACH 'ducklake:<catalog>'` got `FATAL: Database '<catalog>' is not available: Secret with name "<catalog>_adm_postgres" not found` and the connection was killed during the eager-attach phase. Bootstrap was reading a stale path for the per-connection tenant identifier, so the `/secrets` fetch ran in single-tenant mode and cached the wrong (unprefixed) variants of each catalog's postgres-creds reference; the subsequent multi-tenant ATTACH then couldn't resolve them. Bootstrap now reads the tenant identifier through the supported settings path and passes its just-established session state directly to the secret fetch, so the multi-tenant secrets are cached before ATTACH runs. Reproduces locally in seconds with `matview_stress --smoke` against a freshly-registered user; verified with the full e2e suite (3728 tests, 0 fail) plus DuckDB-isolated serial suite (15/15) plus matview/tantivy stress smokes.
+
+### Notes
+
+- Chart version **0.3.38** tracks appVersion `0.10.28`.
+- ARM64 (`aarch64-linux-0.10.28`) and x86_64 (`x64-linux-0.10.28`) Docker images built on AWS EC2 (Graviton 2 / Intel Xeon).
+
 ## [0.10.27] - 2026-04-29
 
 ### Fixes
