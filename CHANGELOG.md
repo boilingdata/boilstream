@@ -5,7 +5,20 @@ All notable changes to BoilStream will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.29] - 2026-04-30
+
+Re-release of 0.10.28 with the multi-tenant bootstrap fix actually compiled into the binary. The 0.10.28 images on Docker Hub (`x64-linux-0.10.28`, `aarch64-linux-0.10.28`) were built against the AMI's pre-baked `libduckdb_static.a`, which `scripts/build_linux_release.sh` deliberately keeps from re-extracting on every build (`# duckdb is intentionally NOT in this list ... Re-bake the AMI to update DuckDB.`). The pragma_functions.cpp fix lives in DuckDB C++ source, so it never made it into the 0.10.28 binary and staging continued to fail with the original `Secret with name "<catalog>_adm_postgres" not found` signature after rollout. The 0.10.29 build re-bakes the build AMIs first so the static library matches the source tarball, then ships the same fix.
+
+If you pulled `0.10.28`, **upgrade to `0.10.29`** — the fix is identical, but only `0.10.29` actually contains it. (Mirrors the 0.10.25 → 0.10.26 retraction we did earlier this week for an analogous "stale source on EC2" pipeline gap.)
+
+### Notes
+
+- Chart version **0.3.39** tracks appVersion `0.10.29`.
+- ARM64 (`aarch64-linux-0.10.29`) and x86_64 (`x64-linux-0.10.29`) Docker images built on freshly-baked AMIs.
+
 ## [0.10.28] - 2026-04-30
+
+**⚠️ Retracted — see 0.10.29 below for a working build.** The fix described in this entry exists in source but did not make it into the published Docker images; the EC2 build script reused a pre-baked `libduckdb_static.a` from the AMI rather than recompiling it from the (correct) source tarball it had just uploaded. The `0.10.28` images therefore still hit the original bootstrap failure on staging. Use `0.10.29`.
 
 ### Fixes
 
