@@ -5,6 +5,100 @@ All notable changes to BoilStream will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.64] - 2026-05-13
+
+Two weeks of cluster-mode hardening, multi-tenant pgwire handshake scaling,
+release-pipeline integrity, and matview/tantivy stability — folded into a
+single release. The thirty-five patch versions between 0.10.29 and 0.10.64
+were development-only internal increments; this is the first public
+release since 0.10.29 that we recommend deploying.
+
+### Highlights
+
+- **PGWire handshake scales to hundreds of connections per node.** The
+  per-user session setup (CREATE SCHEMA + per-topic VIEW creation +
+  SET search_path) used to run on every pgwire handshake, serialising
+  on DuckDB's catalog write-lock for the same `internal_user_id` and
+  compounding with a warmup-race retry on cold DuckLake ATTACH —
+  observed 84 s handshake stall on staging. Setup now runs at most
+  once per `(server-process, internal_user_id)` via a
+  `tokio::sync::OnceCell` dedup gate and is detached from the
+  handshake (`tokio::spawn`), so handshake returns immediately;
+  subsequent connections for the same user pay nothing. A 5 s
+  wall-clock cap on the warmup-race retry stays as defense in depth.
+
+- **Cluster mode hardening.** Workers now read OAuth token claims,
+  catalog metadata, and grants through a leader fallback path
+  (0.10.31 – 0.10.33), Bearer-auth requests are server-side-proxied
+  to the leader when the worker can't resolve them locally (0.10.32),
+  worker_sync re-reads the leader from S3 on retry instead of using a
+  stale cache (0.10.36), and manifest writes coalesce + survive
+  ETag drift (0.10.37 – 0.10.39). FlightRPC ingestion strictly
+  enforces the `ingest` purpose claim (0.10.35).
+
+- **Synchronous topic provisioning on CREATE TABLE** (0.10.30) — the
+  CREATE TABLE returns only after the topic exists and is queryable,
+  removing the "race between CREATE and INSERT" window that streaming
+  clients used to work around with sleep-and-retry.
+
+- **SPA + matview routing land users on the pod that owns their
+  catalog** (0.10.40 – 0.10.52). Matview executor is leader-only and
+  vends credentials via leader RPC, catalog ownership has a per-
+  matview gate, the initial catalog master is pinned to the creator
+  pod, and the SPA walks the user's catalog list to find the right
+  master pin instead of round-robining. Closes the matview "wrong
+  pod" failure class.
+
+- **Storage isolation per user** (0.10.54) — the configured storage
+  prefix no longer accidentally appears in user-data write paths.
+
+- **Tantivy hot/cold tier matures.** Hot-tier indexing writes to
+  S3 on commit, cold tier hydrates on the first query, and the
+  ALTER TABLE switch between parquet-only / tantivy-only / both is
+  validated atomically against the "at least one format must be
+  enabled" invariant (server enforces; test in 0.10.64 was updated
+  to set both flags in one statement).
+
+- **Release pipeline integrity** (0.10.55 – 0.10.57). The EC2 build
+  AMI re-extracts C++ extensions on every build (so a fix in
+  multilake-extension actually lands in the binary), and `build.rs`
+  fingerprints DuckDB static libraries so a stale `libduckdb_static.a`
+  in the AMI no longer silently masks a fix. Both gaps had previously
+  produced "ships pre-fix binary under post-fix tag" failures
+  (0.10.25 and 0.10.28 retractions).
+
+- **Auth-server self-recovery from socket leak** (0.10.63). The auth
+  listener now watches `/proc/net/tcp{,6}` for CLOSE_WAIT pile-up
+  and `process::exit(1)`s when the count exceeds
+  `BOILSTREAM_AUTH_CLOSE_WAIT_LIMIT` (default 50). Kubernetes
+  restarts the pod, clearing the leak — keeps staging available
+  while the root cause is investigated.
+
+### Status on Hetzner staging (`app.boilstream.com`)
+
+All three pods on 0.10.64 (`aarch64-linux-0.10.64`), helm upgrade clean,
+zero rollback. Curated regression suite **275 passed; 0 failed; 0
+ignored** in 680 s (`make test-staging` against the live cluster).
+Stress smokes both green:
+
+- `matview-stress --smoke`: ALL PASS — 800 rows ingested, 600/800
+  closed-window rows verified at 100 %, value aggregate matches
+  expected (200 rows fell into still-open windows, by design).
+- `tantivy-stress --smoke`: PASS — search index hit + LIKE pushdown
+  both pass; tantivy-only mode (parquet off, tantivy on) ALTER
+  passes atomically; remaining warns are tantivy commit-window
+  related on a 7-row smoke corpus, not the ALTER path.
+
+### Notes
+
+- Chart version **0.3.74** tracks appVersion `0.10.64`.
+- ARM64 (`aarch64-linux-0.10.64`) and x86_64 (`x64-linux-0.10.64`)
+  Docker images on Docker Hub, built on AWS EC2 (Graviton 2 / Intel
+  Xeon) against freshly-extracted source tarballs.
+- Public binaries at `s3://boilstream.com/binaries/{linux-aarch64,linux-x64}/`
+  (`boilstream-0.10.64` + `boilstream-admin-0.10.64`, with `-generic`
+  suffix on the Neoverse N1-safe ARM64 build).
+
 ## [0.10.29] - 2026-04-30
 
 Re-release of 0.10.28 with the multi-tenant bootstrap fix actually compiled into the binary. The 0.10.28 images on Docker Hub (`x64-linux-0.10.28`, `aarch64-linux-0.10.28`) were built against the AMI's pre-baked `libduckdb_static.a`, which `scripts/build_linux_release.sh` deliberately keeps from re-extracting on every build (`# duckdb is intentionally NOT in this list ... Re-bake the AMI to update DuckDB.`). The pragma_functions.cpp fix lives in DuckDB C++ source, so it never made it into the 0.10.28 binary and staging continued to fail with the original `Secret with name "<catalog>_adm_postgres" not found` signature after rollout. The 0.10.29 build re-bakes the build AMIs first so the static library matches the source tarball, then ships the same fix.
