@@ -17,6 +17,9 @@ spec:
     - { name: flightsql, port: 50250, targetPort: 50250 }
     - { name: auth,      port: 8443,  targetPort: 8443 }
     - { name: cluster,   port: 8444,  targetPort: 8444 }
+    {{- if .Values.cpMetadata.enabled }}
+    - { name: cp-metadata, port: {{ .Values.cpMetadata.port }}, targetPort: {{ .Values.cpMetadata.port }} }
+    {{- end }}
 ---
 {{- range $i, $_ := until (int .Values.replicas) }}
 apiVersion: v1

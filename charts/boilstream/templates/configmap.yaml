@@ -96,6 +96,15 @@ data:
       leader_stale_threshold_secs: 60
       broker_heartbeat_interval_secs: 15
       broker_stale_threshold_secs: 60
+    {{- if .Values.cpMetadata.enabled }}
+      cp_metadata_enabled: true
+      cp_metadata_port: {{ .Values.cpMetadata.port }}
+      cp_metadata_token: "__CP_METADATA_TOKEN__"
+      cp_metadata_peers:
+{{- range $i := until (int .Values.replicas) }}
+        - "boilstream-{{ $i }}:voter=quack:boilstream-{{ $i }}.boilstream-headless.{{ $.Values.namespace }}.svc.cluster.local:{{ $.Values.cpMetadata.port }}"
+{{- end }}
+    {{- end }}
     {{- if .Values.clusterTls.enabled }}
       tls:
         enabled: true
@@ -106,6 +115,11 @@ data:
     {{- end }}
     '''
     c = re.sub(r'cluster_mode:\n(  .*\n)+', cluster_block, c, count=1)
+{{- if .Values.cpMetadata.enabled }}
+    # cp-metadata shared group token — injected from the CP_METADATA_TOKEN env (Secret-sourced),
+    # identical on every pod. Spliced in (not sed'd) so token chars don't collide with sed syntax.
+    c = c.replace("__CP_METADATA_TOKEN__", os.environ["CP_METADATA_TOKEN"])
+{{- end }}
 
     # Enable TLS on PGWire, Kafka, and auth_server so SNI-based routing works through
     # Envoy Gateway. Uses the wildcard cert mounted at /tls. (tls_cert_pem/tls_key_pem

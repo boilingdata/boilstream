@@ -103,6 +103,31 @@ clusterTls:
   # short Service name. Matches what cluster_mode.advertised_host produces.
   dnsNames: []                        # if empty, chart populates with sensible defaults
 
+# Quack Multi-Raft control-plane metadata catalog (cp-metadata). OPT-IN.
+# When enabled, the DuckLake catalog registry + control-plane metadata are kept
+# strongly consistent across pods via NuRaft quorum
+# (https://docs.boilstream.com/guide/multi-raft). Bulk data still flows hot-node → S3.
+#
+# PREREQUISITES (cp-metadata will not form quorum without all of these):
+#   * clusterTls.enabled: true — mTLS is mandatory for cp-metadata.
+#   * cert-manager csi-driver (https://cert-manager.io/docs/usage/csi-driver/) installed
+#     in-cluster. The chart uses it to mint a PER-POD cert whose URI SAN encodes that pod's
+#     raft identity (node_id == pod name). A single shared cert cannot carry a per-pod URI
+#     identity, so the csi-driver is required.
+#   * clusterTls.issuer must be an internal CA issuer that supports URI SANs (cert-manager
+#     CA / Vault issuers do; public ACME issuers do NOT).
+# NOTE: per-tenant DuckLake *lakehouse* metadata (ducklake_* tables) is NOT yet multi-raft —
+# that needs the fork's generic multi-raft apply for arbitrary schemas. This flag only governs
+# the cp-metadata control-plane catalog today.
+cpMetadata:
+  enabled: false
+  port: 8445
+  # Shared cp-group token — MUST be identical on every pod. Required when enabled.
+  # Provide via --set cpMetadata.token=... or point existingTokenSecret at a Secret
+  # with a `token` key.
+  token: ""
+  existingTokenSecret: ""
+
 # Envoy Gateway integration. The GatewayClass must already exist in-cluster
 # (installed by the Envoy Gateway Helm chart).
 gateway:

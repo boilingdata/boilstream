@@ -87,6 +87,13 @@ spec:
                 secretKeyRef:
                   name: {{ $superMfaSecret }}
                   key: mfa_secret
+            {{- if .Values.cpMetadata.enabled }}
+            - name: CP_METADATA_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ default "boilstream-cp-metadata" .Values.cpMetadata.existingTokenSecret }}
+                  key: token
+            {{- end }}
           volumeMounts:
             - { name: config-tpl, mountPath: /tpl }
             - { name: config,     mountPath: /cfg }
@@ -109,6 +116,9 @@ spec:
             - { name: flightsql, containerPort: 50250 }
             - { name: auth,    containerPort: 8443 }
             - { name: cluster, containerPort: 8444 }
+            {{- if .Values.cpMetadata.enabled }}
+            - { name: cp-metadata, containerPort: {{ .Values.cpMetadata.port }} }
+            {{- end }}
             - { name: metrics, containerPort: 8081 }
           env:
             - name: RUST_LOG
@@ -160,7 +170,7 @@ spec:
               mountPath: /etc/ssl/certs/ca-certificates.crt
               subPath: trust-bundle.crt
               readOnly: true
-            {{- if .Values.clusterTls.enabled }}
+            {{- if or .Values.clusterTls.enabled .Values.cpMetadata.enabled }}
             - { name: cluster-tls, mountPath: /cluster-tls, readOnly: true }
             {{- end }}
           readinessProbe:
@@ -182,7 +192,28 @@ spec:
           emptyDir: { medium: Memory, sizeLimit: 2Gi }
         - name: tls
           secret: { secretName: {{ $tlsSecret }} }
-        {{- if .Values.clusterTls.enabled }}
+        {{- if .Values.cpMetadata.enabled }}
+        # cp-metadata needs a PER-POD cert whose URI SAN == this pod's raft identity
+        # (node_id == pod name). A single shared cert can't carry a per-pod URI, so we mint
+        # one at pod start via the cert-manager csi-driver. Same mount path (/cluster-tls)
+        # the cluster_mode.tls block (and internal_api mTLS) already reads.
+        - name: cluster-tls
+          csi:
+            driver: csi.cert-manager.io
+            readOnly: true
+            volumeAttributes:
+              csi.cert-manager.io/issuer-name: {{ .Values.clusterTls.issuer.name }}
+              csi.cert-manager.io/issuer-kind: {{ .Values.clusterTls.issuer.kind }}
+              csi.cert-manager.io/issuer-group: cert-manager.io
+              csi.cert-manager.io/common-name: "${POD_NAME}"
+              csi.cert-manager.io/dns-names: "${POD_NAME}.boilstream-headless.${POD_NAMESPACE}.svc.cluster.local,${POD_NAME}.boilstream-headless.${POD_NAMESPACE}.svc"
+              csi.cert-manager.io/uris: "${POD_NAME}"
+              csi.cert-manager.io/key-usages: "server auth,client auth"
+              csi.cert-manager.io/fs-group: "999"
+              csi.cert-manager.io/certificate-file: "tls.crt"
+              csi.cert-manager.io/privatekey-file: "tls.key"
+              csi.cert-manager.io/ca-file: "ca.crt"
+        {{- else if .Values.clusterTls.enabled }}
         - name: cluster-tls
           secret: { secretName: {{ $clusterTlsSecret }} }
         {{- end }}

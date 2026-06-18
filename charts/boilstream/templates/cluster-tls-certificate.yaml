@@ -1,4 +1,6 @@
-{{- if and .Values.clusterTls.enabled (not .Values.clusterTls.existingSecret) }}
+{{- /* When cpMetadata.enabled, per-pod certs are minted via the cert-manager csi-driver
+       (see statefulset.yaml cluster-tls volume), so the single shared cert is not used. */ -}}
+{{- if and .Values.clusterTls.enabled (not .Values.clusterTls.existingSecret) (not .Values.cpMetadata.enabled) }}
 {{- $defaultDnsNames := list
     (printf "*.boilstream-headless.%s.svc.cluster.local" .Values.namespace)
     (printf "boilstream-headless.%s.svc.cluster.local" .Values.namespace)
