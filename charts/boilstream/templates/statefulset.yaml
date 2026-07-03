@@ -207,7 +207,11 @@ spec:
               csi.cert-manager.io/issuer-group: cert-manager.io
               csi.cert-manager.io/common-name: "${POD_NAME}"
               csi.cert-manager.io/dns-names: "${POD_NAME}.boilstream-headless.${POD_NAMESPACE}.svc.cluster.local,${POD_NAME}.boilstream-headless.${POD_NAMESPACE}.svc"
-              csi.cert-manager.io/uris: "${POD_NAME}"
+              # NOTE: the attribute is `uri-sans` (csi-driver docs) — `uris` is silently
+              # ignored, the minted cert then has NO URI SAN, peer identity extraction
+              # falls back to the full DNS SAN (which != node_id) and cp-raft quorum
+              # never forms (silent; only "waiting for cp-group quorum" in logs).
+              csi.cert-manager.io/uri-sans: "${POD_NAME}"
               csi.cert-manager.io/key-usages: "server auth,client auth"
               csi.cert-manager.io/fs-group: "999"
               csi.cert-manager.io/certificate-file: "tls.crt"
