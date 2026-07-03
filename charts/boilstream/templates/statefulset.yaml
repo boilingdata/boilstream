@@ -206,12 +206,14 @@ spec:
               csi.cert-manager.io/issuer-kind: {{ .Values.clusterTls.issuer.kind }}
               csi.cert-manager.io/issuer-group: cert-manager.io
               csi.cert-manager.io/common-name: "${POD_NAME}"
-              csi.cert-manager.io/dns-names: "${POD_NAME}.boilstream-headless.${POD_NAMESPACE}.svc.cluster.local,${POD_NAME}.boilstream-headless.${POD_NAMESPACE}.svc"
-              # NOTE: the attribute is `uri-sans` (csi-driver docs) — `uris` is silently
-              # ignored, the minted cert then has NO URI SAN, peer identity extraction
-              # falls back to the full DNS SAN (which != node_id) and cp-raft quorum
-              # never forms (silent; only "waiting for cp-group quorum" in logs).
-              csi.cert-manager.io/uri-sans: "${POD_NAME}"
+              # Raft peer identity: quack's extractor prefers a URI SAN and otherwise falls
+              # back to the FIRST DNS SAN, comparing the string verbatim to node_id. The
+              # csi-driver cannot mint a bare node_id as a URI SAN (`uri-sans: boilstream-2`
+              # fails Go URI validation: needs a scheme; and the legacy `uris` attribute is
+              # silently ignored — certs then carry no URI SAN at all and quorum never
+              # forms). So the bare pod name goes FIRST in dns-names to be the identity
+              # the extractor picks; the full names follow for normal TLS hostname checks.
+              csi.cert-manager.io/dns-names: "${POD_NAME},${POD_NAME}.boilstream-headless.${POD_NAMESPACE}.svc.cluster.local,${POD_NAME}.boilstream-headless.${POD_NAMESPACE}.svc"
               csi.cert-manager.io/key-usages: "server auth,client auth"
               csi.cert-manager.io/fs-group: "999"
               csi.cert-manager.io/certificate-file: "tls.crt"
